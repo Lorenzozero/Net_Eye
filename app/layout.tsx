@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Providers from "@/components/Providers";
+import { NetworkProvider } from "@/contexts/NetworkContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NetworkScope - Monitoraggio Rete",
-  description: "Dashboard professionale per il monitoraggio di rete",
+  title: "Net_Eye - Network Monitoring",
+  description: "Professional network monitoring and discovery platform",
 };
 
 export default function RootLayout({
@@ -25,12 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Providers>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <NetworkProvider>
           {children}
-        </Providers>
+        </NetworkProvider>
       </body>
     </html>
   );
