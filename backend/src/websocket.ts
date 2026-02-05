@@ -1,51 +1,67 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { query } from './db';
+import { Device, Agent } from './types';
+
+interface ClientMessage {
+  type: string;
+  payload?: any;
+}
+
+export interface ServerEvent {
+  type: 'agent_registered' | 'scan_update' | 'devices_snapshot';
+  data: any;
+}
 
 const clients = new Set<WebSocket>();
 
 export const setupWebSocket = (wss: WebSocketServer) => {
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('New WebSocket client connected');
+  wss.on('connection', async (ws: WebSocket) => {
     clients.add(ws);
+    console.log('WebSocket client connected, total:', clients.size);
 
-    ws.on('message', (message: string) => {
+    // On first connection, send snapshot di agent e dispositivi
+    try {
+      const agents = await query<Agent>('SELECT * FROM agents ORDER BY last_seen DESC');
+      const devices = await query<Device>('SELECT * FROM devices ORDER BY last_seen DESC');
+
+      ws.send(JSON.stringify({
+        type: 'devices_snapshot',
+        data: {
+          agents,
+          devices,
+        },
+      } satisfies ServerEvent));
+    } catch (err) {
+      console.error('Error sending initial snapshot:', err);
+    }
+
+    ws.on('message', (message: Buffer) => {
       try {
-        const data = JSON.parse(message.toString());
-        console.log('Received message:', data);
-        
-        // Echo back for now, can add specific handlers
-        ws.send(JSON.stringify({ type: 'ack', data }));
-      } catch (error) {
-        console.error('WebSocket message error:', error);
+        const parsed = JSON.parse(message.toString()) as ClientMessage;
+        // In futuro: filtrare per agent, subscribe solo a certe reti, ecc.
+        console.log('WS message from client:', parsed.type);
+      } catch (err) {
+        console.error('Invalid WS message:', err);
       }
     });
 
     ws.on('close', () => {
-      console.log('Client disconnected');
       clients.delete(ws);
+      console.log('WebSocket client disconnected, total:', clients.size);
     });
 
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
+    ws.on('error', (err) => {
+      console.error('WebSocket error:', err);
       clients.delete(ws);
     });
-
-    // Send initial connection success
-    ws.send(JSON.stringify({ 
-      type: 'connected', 
-      timestamp: new Date().toISOString() 
-    }));
   });
 };
 
-export const broadcastToClients = (message: any) => {
-  const payload = JSON.stringify(message);
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
+export const broadcastToClients = (event: ServerEvent) => {
+  const msg = JSON.stringify(event);
+  for (const client of clients) {
+    if (client.readyState === client.OPEN) {
+      client.send(msg);
     }
-  });
-};
-
-export const getConnectedClientsCount = (): number => {
-  return clients.size;
+  }
 };

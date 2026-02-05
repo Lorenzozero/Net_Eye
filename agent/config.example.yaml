@@ -1,0 +1,5 @@
+# Config di esempio per Net_Eye Agent
+backend_url: "http://localhost:3001"
+agent_secret: "change_this_secret_in_production"
+scan_interval_seconds: 60
+subnet: "192.168.1.0/24"

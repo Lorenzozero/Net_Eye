@@ -1,31 +1,25 @@
-import { Device, ScanResult } from '../types';
+import { Device } from '../types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 export async function fetchDevices(): Promise<Device[]> {
-    const res = await fetch(`${API_URL}/api/v1/devices`);
+    const res = await fetch(`${BACKEND_URL}/api/devices`);
     if (!res.ok) throw new Error('Impossibile recuperare i dispositivi');
     return res.json();
 }
 
-export async function fetchDevice(ip: string): Promise<Device> {
-    const res = await fetch(`${API_URL}/api/v1/devices/${ip}`);
+export async function fetchDevice(id: string): Promise<Device> {
+    const res = await fetch(`${BACKEND_URL}/api/devices/${id}`);
     if (!res.ok) throw new Error('Impossibile recuperare il dispositivo');
     return res.json();
 }
 
-export async function triggerNetworkScan(subnet: string = '192.168.1.0/24'): Promise<ScanResult> {
-    const res = await fetch(`${API_URL}/api/v1/scan/network?subnet=${subnet}`, {
-        method: 'POST',
-    });
-    if (!res.ok) throw new Error('Impossibile avviare la scansione di rete');
-    return res.json();
+// In questa versione l'app non avvia direttamente lo scan: lo fanno gli agent.
+// Possiamo però aggiungere in futuro endpoint per chiedere all'agent di forzare una scansione.
+export async function triggerNetworkScan(): Promise<{ message: string }> {
+    return { message: 'La scansione viene eseguita dagli agent installati nelle reti. Assicurati che siano in esecuzione.' };
 }
 
-export async function triggerPortScan(ip: string): Promise<ScanResult> {
-    const res = await fetch(`${API_URL}/api/v1/scan/ports/${ip}`, {
-        method: 'POST',
-    });
-    if (!res.ok) throw new Error('Impossibile avviare la scansione delle porte');
-    return res.json();
+export async function triggerPortScan(): Promise<{ message: string }> {
+    return { message: 'La scansione delle porte è gestita dagli agent. Nessuna azione diretta dal frontend.' };
 }
