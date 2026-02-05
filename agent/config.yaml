@@ -1,0 +1,24 @@
+# Net_Eye Agent Configuration
+backend_url: "http://localhost:3001"
+agent_secret: "change_this_secret_in_production"
+
+# Scan settings
+scan_interval_seconds: 60
+heartbeat_interval_seconds: 30
+
+# Network to scan: "auto" or manual subnet like "192.168.1.0/24"
+subnet: "auto"
+
+# Common ports to check (TCP)
+common_ports:
+  - 22    # SSH
+  - 80    # HTTP
+  - 443   # HTTPS
+  - 3389  # RDP
+  - 8080  # HTTP-Alt
+  - 21    # FTP
+  - 3306  # MySQL
+  - 5432  # PostgreSQL
+
+# Port scan timeout in seconds
+port_scan_timeout: 0.5
