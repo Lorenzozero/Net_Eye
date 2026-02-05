@@ -1,4 +1,4 @@
-import { Device } from '../types';
+import { Device, Agent, Scan } from '@/types';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
@@ -14,12 +14,34 @@ export async function fetchDevice(id: string): Promise<Device> {
     return res.json();
 }
 
-// In questa versione l'app non avvia direttamente lo scan: lo fanno gli agent.
-// Possiamo però aggiungere in futuro endpoint per chiedere all'agent di forzare una scansione.
-export async function triggerNetworkScan(): Promise<{ message: string }> {
-    return { message: 'La scansione viene eseguita dagli agent installati nelle reti. Assicurati che siano in esecuzione.' };
+export async function fetchDevicesByAgent(agentId: string): Promise<Device[]> {
+    const res = await fetch(`${BACKEND_URL}/api/devices/agent/${agentId}`);
+    if (!res.ok) throw new Error('Impossibile recuperare i dispositivi dell\'agent');
+    return res.json();
 }
 
-export async function triggerPortScan(): Promise<{ message: string }> {
-    return { message: 'La scansione delle porte è gestita dagli agent. Nessuna azione diretta dal frontend.' };
+export async function fetchAgents(): Promise<Agent[]> {
+    const res = await fetch(`${BACKEND_URL}/api/agent`);
+    if (!res.ok) throw new Error('Impossibile recuperare gli agent');
+    return res.json();
+}
+
+export async function fetchScans(): Promise<Scan[]> {
+    const res = await fetch(`${BACKEND_URL}/api/scans`);
+    if (!res.ok) throw new Error('Impossibile recuperare le scansioni');
+    return res.json();
+}
+
+export async function fetchScansByAgent(agentId: string): Promise<Scan[]> {
+    const res = await fetch(`${BACKEND_URL}/api/scans/agent/${agentId}`);
+    if (!res.ok) throw new Error('Impossibile recuperare le scansioni dell\'agent');
+    return res.json();
+}
+
+// Note: Gli agent avviano le scansioni autonomamente.
+// In futuro si può aggiungere un endpoint per forzare scan on-demand.
+export async function triggerNetworkScan(): Promise<{ message: string }> {
+    return { 
+        message: 'Le scansioni vengono eseguite automaticamente dagli agent. Verifica che siano in esecuzione.' 
+    };
 }
