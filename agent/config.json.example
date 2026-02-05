@@ -1,0 +1,12 @@
+{
+  "backend_url": "http://localhost:3001",
+  "agent_secret": "change_this_secret_in_production",
+  "scan_interval": 300,
+  "scan_types": {
+    "network_discovery": true,
+    "port_scan": true,
+    "service_detection": true
+  },
+  "port_scan_range": [20, 21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 8080, 8443],
+  "network_interface": "auto"
+}
