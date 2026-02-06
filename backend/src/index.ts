@@ -1,55 +1,69 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import { WebSocketServer } from 'ws';
-import { config } from './config';
-import { initDatabase } from './db';
-import { agentRouter } from './routes/agent';
-import { deviceRouter } from './routes/device';
-import { scanRouter } from './routes/scan';
-import { setupWebSocket } from './websocket';
-import rateLimit from 'express-rate-limit';
+import express from "express";
+import cors from "cors";
+import http from "http";
+import { setupWebSocket, getWebSocketServer } from "./websocket";
+import { initDb, getDb } from "./db";
+import { config } from "./config";
+import agentRoutes from "./routes/agent";
+import deviceRoutes from "./routes/devices";
+import scanRoutes from "./routes/scans";
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: config.allowedOrigins,
-  credentials: true
-}));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100
-});
-app.use('/api/', limiter);
-
-// Body parsing
 app.use(express.json());
 
-// Routes
-app.use('/api/agent', agentRouter);
-app.use('/api/devices', deviceRouter);
-app.use('/api/scans', scanRouter);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+      if (!config.allowedOrigins.length) {
+        return callback(null, false);
+      }
+
+      if (config.allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.warn("[CORS] Origin non autorizzato:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+  })
+);
+
+app.use("/api/agent", agentRoutes);
+app.use("/api/devices", deviceRoutes);
+app.use("/api/scans", scanRoutes);
+
+app.get("/health", async (_req, res) => {
+  try {
+    const db = await getDb();
+    await db.get("SELECT 1");
+
+    const wss = getWebSocketServer?.();
+    const wsOk = !!wss;
+
+    res.json({
+      status: "ok",
+      db: "ok",
+      websocket: wsOk ? "ok" : "not_initialized",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[Health] check failed:", err);
+    res.status(500).json({
+      status: "error",
+      error: "Health check failed",
+    });
+  }
 });
 
-// Initialize database
-initDatabase().then(() => {
-  const server = app.listen(config.port, () => {
-    console.log(`✓ Backend running on port ${config.port}`);
-  });
+const server = http.createServer(app);
 
-  // Setup WebSocket
-  const wss = new WebSocketServer({ server, path: '/ws' });
-  setupWebSocket(wss);
-  console.log('✓ WebSocket server initialized');
-}).catch((err) => {
-  console.error('Failed to initialize database:', err);
-  process.exit(1);
+initDb().then(() => {
+  setupWebSocket(server);
+
+  server.listen(config.port, () => {
+    console.log(`Backend in ascolto sulla porta ${config.port}`);
+  });
 });
