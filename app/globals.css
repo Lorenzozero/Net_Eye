@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Tailwind v4: abilita il dark mode basato sulla classe .dark (toggle navbar)
+   invece che su prefers-color-scheme di sistema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

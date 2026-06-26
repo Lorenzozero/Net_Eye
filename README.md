@@ -1,145 +1,326 @@
 <div align="center">
 
-# 👁️ Net Eye
+# 👁️ NetworkScope
 
-**Network monitoring dashboard in real-time**
+### _La tua rete, finalmente sotto controllo._
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38bdf8?logo=tailwindcss)
-![License](https://img.shields.io/badge/license-MIT-green)
+**Dashboard di monitoraggio rete in tempo reale — scoperta dispositivi, scansione porte e topologia interattiva in stile Packet Tracer.**
+
+<br/>
+
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
+![Status](https://img.shields.io/badge/status-MVP%20attivo-success?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+![PRs](https://img.shields.io/badge/PRs-welcome-orange?style=flat-square)
+![Dark Mode](https://img.shields.io/badge/dark%20mode-🌙%20sì-1f2937?style=flat-square)
 
 </div>
 
 ---
 
-## 📖 Overview
+## 📖 Indice
 
-**Net Eye** è una dashboard web per il monitoraggio della rete locale in tempo reale. Permette di visualizzare tutti i dispositivi connessi, analizzare le porte aperte, monitorare il traffico e avviare scansioni di rete direttamente dall'interfaccia.
-
-Il frontend (questo repo) si connette a un backend FastAPI che esegue le scansioni tramite `nmap` e altri strumenti di rete.
+- [✨ Perché NetworkScope](#-perché-networkscope)
+- [🎯 A chi serve](#-a-chi-serve-target)
+- [🚀 Funzionalità](#-funzionalità)
+- [🖼️ Le 4 schermate](#️-le-4-schermate)
+- [🏗️ Architettura](#️-architettura)
+- [🧰 Stack tecnico](#-stack-tecnico)
+- [⚡ Avvio rapido](#-avvio-rapido)
+- [🧪 Come testare dalla GUI web](#-come-testare-dalla-gui-web)
+- [🐳 Avvio con Docker](#-avvio-con-docker)
+- [🔌 Backend & API](#-backend--api)
+- [🗺️ Roadmap](#️-roadmap)
+- [📜 Licenza](#-licenza)
 
 ---
 
-## ✨ Funzionalità
+## ✨ Perché NetworkScope
 
-- **Dashboard in tempo reale** — KPI aggiornati ogni 10 secondi (dispositivi totali, online, reti, avvisi sicurezza)
-- **Mappa topologica** — visualizzazione grafica interattiva dei dispositivi e delle loro connessioni
-- **Monitor traffico** — grafico del traffico di rete in tempo reale
-- **Scansione rete** — avvia una scansione manuale della subnet con un click
-- **Port scan** — analisi delle porte aperte per ogni dispositivo
-- **Lista dispositivi** — tabella dettagliata con IP, MAC, vendor, porte, stato
-- **Raggruppamento per subnet** — dispositivi organizzati per segmento `/24`
-- **Avvisi sicurezza** — rilevamento automatico di vendor sconosciuti e porte anomale
-- **Dark mode** — supporto nativo light/dark
-- **Azioni rapide** — ricerca dispositivi e configurazione agent dalla sidebar
+> _"Conosci ogni dispositivo che respira sulla tua rete — prima che lo faccia qualcun altro."_
+
+La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio router. Telecamere IoT cinesi, vecchi telefoni, NAS dimenticati con la porta 445 spalancata... 🫠
+
+**NetworkScope** trasforma quel caos in una **dashboard chiara, viva e bellissima**:
+
+| Senza NetworkScope 😵 | Con NetworkScope 😎 |
+|---|---|
+| `arp -a` in un terminale nero | Topologia interattiva drag & drop |
+| "Boh, c'è qualcosa su `.47`" | Hostname, vendor, porte, stato — in un click |
+| Zero alert di sicurezza | Conteggio automatico delle anomalie |
+| Tool brutti anni '90 | UI moderna, dark mode, responsive |
+
+---
+
+## 🎯 A chi serve (Target)
+
+| 👤 Profilo | 💡 Caso d'uso |
+|---|---|
+| 🏠 **Home lab & smart home** | Tieni d'occhio IoT, NAS, console e ospiti sulla Wi-Fi |
+| 🛡️ **Studenti di sicurezza / CTF** | Visualizza scansioni, porte aperte e mappa di rete |
+| 🧑‍💻 **Sysadmin di PMI** | Inventario dispositivi e monitoraggio veloce senza tool pesanti |
+| 🎓 **Didattica networking** | Topologia "Packet Tracer-style" per spiegare reti reali |
+
+---
+
+## 🚀 Funzionalità
+
+- 📊 **Dashboard live** — dispositivi totali, online, reti monitorate e avvisi di sicurezza, con refresh automatico ogni 10s.
+- 🗺️ **Topologia interattiva** — nodi trascinabili, zoom con rotella, pan, gateway evidenziato e pannello dettagli per dispositivo (`TopologyMap`, SVG puro, zero librerie pesanti).
+- 🔍 **Scansione rete & porte REALE** — il backend incluso fa ping-sweep della subnet, legge l'ARP, risolve hostname/vendor e scansiona le porte TCP dei dispositivi veri.
+- 🧠 **Identificazione intelligente** — riconosce telefoni (iPhone/Android, anche con MAC randomizzato), access point, NAS, stampanti, camere IP, **inverter FV**, **colonnine EV**, container Docker, smart TV e IoT, con OS e vendor.
+- 📇 **Inventario dispositivi** — tabella ricercabile per IP / hostname / vendor, modale di dettaglio con porte aperte.
+- 🧩 **Raggruppamento per subnet** — i dispositivi vengono aggregati automaticamente per rete `/24`, con rinomina inline.
+- 🤖 **Gestione Agent** — scarica installer (Windows `.bat`, Linux `.sh`, Python) e monitora gli agent registrati.
+- 🌙 **Dark / Light mode** — toggle in navbar che pilota davvero il tema (Tailwind v4 `@custom-variant`), persistente in localStorage.
+- 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
+- 🔗 **Analisi flussi/connessioni** — `netstat` mostra le connessioni attive con **protocollo** (HTTPS, DNS, SSH…), **da quale dispositivo** e **verso quale destinazione** (reverse DNS: github.com, Google, Telegram…), in tabella e su **mappa dei flussi**.
+- 🖱️ **Card KPI cliccabili** — Dispositivi/Online/Reti/Avvisi aprono un modale con dettagli ed **evidenze** (es. quali host hanno porte anomale e perché).
+- 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
+
+---
+
+## 🖼️ Le schermate
+
+| Rotta | Pagina | Cosa fa |
+|---|---|---|
+| `/` | 🏠 **Dashboard** | Hub: KPI, topologia compatta, traffico, azioni rapide |
+| `/dispositivi` | 📇 **Dispositivi** | Inventario completo con ricerca e dettagli di sicurezza |
+| `/mappa` | 🗺️ **Mappa** | Topologia a schermo intero, interattiva |
+| `/traffico` | 📈 **Traffico** | Throughput e **pacchetti/s in tempo reale**, totali + **mappa dei flussi/connessioni attive** |
+| `/impostazioni` | ⚙️ **Impostazioni** | Agent, download installer, tema, notifiche |
 
 ---
 
 ## 🏗️ Architettura
 
 ```
-net-eye/
-├── app/                    # Next.js App Router
-│   ├── page.tsx            # Dashboard principale
-│   ├── dispositivi/        # Lista completa dispositivi
-│   ├── mappa/              # Topologia fullscreen
-│   └── impostazioni/       # Configurazione agent
-├── components/
-│   ├── Layout.tsx          # Layout comune + sidebar
-│   ├── TopologyMap.tsx     # Mappa rete interattiva
-│   ├── TrafficChart.tsx    # Grafico traffico
-│   ├── DeviceList.tsx      # Tabella dispositivi
-│   └── NetworkGroup.tsx    # Gruppo per subnet
-├── lib/
-│   └── api.ts              # Client API verso il backend
-├── types/                  # TypeScript types
-└── contexts/               # React Contexts (stato globale)
+🌐 Browser
+   │  (polling 10–15s)
+   ▼
+⚛️ Next.js 16 · App Router  ──►  RootLayout → Providers → ThemeContext
+   │
+   ├─ 🏠 /             ┐
+   ├─ 📇 /dispositivi  │  Pagine "use client"
+   ├─ 🗺️ /mappa        │
+   └─ ⚙️ /impostazioni ┘
+        │
+        ▼
+🧩 Componenti UI · TopologyMap · DeviceList · NetworkGroup · TrafficChart · Layout
+        │
+        ▼
+🔗 lib/api.ts  +  types/index.ts   (unico punto di integrazione dati)
+        │
+        ▼
+🟩 Backend REALE · server.mjs · http://localhost:8000
+   (ping-sweep · arp · reverse DNS · OUI · port scan)
+        │
+        ▼
+🌐 La tua rete locale (x.y.z.0/24)
 ```
 
-Il backend espone le API REST su `http://localhost:8000` (configurabile via variabile d'ambiente).
+> 💡 **Nota:** il cuore è il frontend Next.js, ma il repo include anche un **backend di scansione reale** ([`server.mjs`](server.mjs), zero dipendenze) che popola la dashboard con i dispositivi veri della tua LAN, più un **mock** ([`mock-api.mjs`](mock-api.mjs)) per la demo offline. Base API configurabile via `NEXT_PUBLIC_API_URL`. Vedi [Come testare](#-come-testare-dalla-gui-web).
 
 ---
 
-## 🚀 Quick Start
+## 🧰 Stack tecnico
 
-### Prerequisiti
+| Livello | Tecnologia | Perché |
+|---|---|---|
+| **Framework** | Next.js 16 (App Router) + React 19 | Server Components, routing moderno, ottime performance |
+| **Linguaggio** | TypeScript 5 (`strict`) | Type-safety end-to-end (`Device`, `Agent`, `ScanResult`) |
+| **Styling** | Tailwind CSS 4 | UI consistente, dark mode nativa, zero CSS custom sparso |
+| **Icone** | `lucide-react` | Set coerente e leggero |
+| **Grafici** | `recharts` | Area chart fluidi e theme-aware |
+| **Topologia** | SVG nativo + hook React | Drag/zoom/pan **senza** dipendenze pesanti = bundle snello |
+| **Container** | Docker (`Dockerfile.dev`, node:20-alpine) | Ambiente riproducibile |
 
-- Node.js 18+
-- Backend Net Eye in esecuzione su `localhost:8000`
+**Scelte che rendono il progetto solido:**
+- 🧠 **Un solo data layer** (`lib/api.ts`): cambiare backend = cambiare 1 file.
+- 🪶 **Topologia fatta a mano in SVG**: niente `d3`/`vis.js` da 200 KB, controllo totale su UX.
+- 🔒 **`strict: true`** in TypeScript: i bug si prendono a compile-time.
+- ♻️ **Componenti riutilizzabili** condivisi tra Dashboard e pagine dedicate.
 
-### Installazione
+---
+
+## ⚡ Avvio rapido
+
+> Requisiti: **Node.js ≥ 20** e npm.
 
 ```bash
-# Clona il repo
-git clone https://github.com/Lorenzozero/Net_Eye.git
-cd Net_Eye
-
-# Installa le dipendenze
+# 1. Installa le dipendenze
 npm install
 
-# Avvia il server di sviluppo
+# 2. Avvia il backend di scansione REALE (Terminale 1)
+npm run backend
+
+# 3. Avvia il frontend (Terminale 2)
 npm run dev
 ```
 
-Apri [http://localhost:3000](http://localhost:3000).
+➡️ Apri **http://localhost:3000** e dopo ~15s vedrai i dispositivi reali della tua rete 🎉
 
-### Con Docker
+| Comando | Azione |
+|---|---|
+| `npm run backend` | 🛰️ Backend di scansione **reale** della rete (porta 8000) |
+| `npm run mock` | 🧪 Backend finto con dati demo (porta 8000) |
+| `npm run dev` | Server di sviluppo frontend con hot-reload |
+| `npm run build` | Build di produzione |
+| `npm start` | Avvia la build di produzione |
+| `npm run lint` | Controllo ESLint |
+
+---
+
+## 🧪 Come testare dalla GUI web
+
+### 🅰️ Monitoraggio REALE della tua rete (lo scopo del progetto)
+
+Il repo include un **backend di scansione reale** a zero dipendenze ([`server.mjs`](server.mjs)) che **non simula nulla**: rileva la tua subnet, fa il **ping-sweep** della `/24`, legge la **tabella ARP** per i MAC, risolve **hostname** (reverse DNS) e **vendor** (OUI + lookup online), e fa **scansione porte TCP reale**. Non serve essere amministratore.
 
 ```bash
-docker build -f Dockerfile.dev -t net-eye .
-docker run -p 3000:3000 net-eye
+# Terminale 1 — avvia il backend di scansione (porta 8000)
+npm run backend       # = node server.mjs
+
+# Terminale 2 — avvia il frontend (porta 3000)
+npm run dev
+```
+
+Apri **http://localhost:3000**: dopo ~15s vedrai i **dispositivi reali** della tua LAN. Il backend ri-scansiona da solo ogni 60s; il pulsante **"Avvia Scansione"** forza un refresh; il pulsante **"Scan"** su un dispositivo ne analizza le porte aperte dal vivo.
+
+> ⚙️ **Come funziona davvero**
+> | Dato | Tecnica |
+> |---|---|
+> | Host attivi | `ping` sweep di `x.y.z.1–254` in parallelo |
+> | MAC address | parsing di `arp -a` di sistema |
+> | Hostname | reverse DNS + **NetBIOS** (`nbtstat`, Windows) |
+> | Vendor | tabella **OUI offline** (170+ prefissi) + coda online **throttolata e persistente** (`.vendor-cache.json`) |
+> | Porte aperte | **fingerprint** automatico (~24 porte) + scan profondo on-demand |
+> | Tipo + OS | classificazione per **firma porte + vendor + MAC + hostname** |
+>
+> 🔎 **Identifica automaticamente:** 📱 iPhone (porta 62078) · 🤖 Android/smartphone (anche con **MAC randomizzato** privacy) · 📶 access point/router · 🖥️ PC Windows (SMB/RDP) · 🐧 server Linux · 💾 NAS · 🖨️ stampanti · 📷 camere IP (RTSP) · ☀️ **inverter fotovoltaici** (Modbus 502) · 🔌 **colonnine EV** · 📺 smart TV/media (Chromecast) · 🐳 **container Docker**/VM · 💡 IoT (ESP/Tuya/Shelly).
+
+### 🅱️ Demo con dati finti (offline, senza toccare la rete)
+
+Se vuoi solo vedere la UI popolata senza scansionare nulla, usa il **mock** ([`mock-api.mjs`](mock-api.mjs)) con 6 dispositivi di esempio:
+
+```bash
+npm run mock          # Terminale 1 (porta 8000)
+npm run dev           # Terminale 2 (porta 3000)
+```
+
+### ✅ Checklist di collaudo (vale per 🅰️ e 🅱️)
+
+Apri **http://localhost:3000** e verifica:
+
+| ✅ | Pagina | Cosa verificare |
+|---|---|---|
+| ☐ | 🏠 **Dashboard** (`/`) | Le 4 card mostrano i numeri della tua rete (dispositivi, online, reti, avvisi) |
+| ☐ | 🏠 Dashboard | Il grafico **Traffico** si disegna (area blu/viola) |
+| ☐ | 🗺️ **Topologia** | Vedi il **gateway/router** al centro con gli altri nodi in orbita |
+| ☐ | 🗺️ Topologia | **Trascini** un nodo, **zoom** con la rotella, **click** apre il pannello dettagli |
+| ☐ | 🔍 **Scansione** | Il pulsante "Avvia Scansione" cambia stato e torna "Pronto" dopo qualche secondo |
+| ☐ | 📇 **Dispositivi** (`/dispositivi`) | Tabella popolata; la **ricerca** filtra per IP/hostname/vendor |
+| ☐ | 📇 Dispositivi | Click su una riga → **modale** con MAC, vendor, porte aperte |
+| ☐ | 🧩 Dashboard | In "Dettaglio Reti" puoi **rinominare** un hostname (matita → salva) |
+| ☐ | ⚙️ **Impostazioni** (`/impostazioni`) | Tabella **Agent**: in modalità reale compare lo **scanner locale** (questo PC) come agente online |
+| ☐ | 🌙 **Tema** | Il toggle 🌙/☀️ cambia tema e **resta** dopo un refresh |
+| ☐ | 📱 **Responsive** | Riduci la finestra: la UI si adatta (DevTools → modalità mobile) |
+| ☐ | 🧰 **Console** | DevTools (F12) → **nessun errore rosso** in console |
+
+### 🅲️ Solo UI, senza alcun backend
+
+```bash
+npm run dev
+```
+
+L'app parte comunque: vedrai **stati vuoti/zero** (nessun dispositivo). In console comparirà un errore di `fetch` verso `:8000` — è **atteso** e dimostra che il data layer tenta correttamente la connessione. Utile per testare layout, navigazione, tema e responsività.
+
+> 💡 **Health check da terminale** (con backend reale o mock attivo):
+> ```bash
+> curl http://localhost:8000/api/v1/devices   # → JSON con i dispositivi rilevati
+> curl http://localhost:3000                   # → HTML 200 della dashboard
+> ```
+
+---
+
+## 🐳 Avvio con Docker
+
+Il progetto include un `Dockerfile.dev` pronto:
+
+```bash
+# Build dell'immagine
+docker build -f Dockerfile.dev -t networkscope:dev .
+
+# Avvio (porta 3000 esposta)
+docker run -it --rm -p 3000:3000 networkscope:dev
+```
+
+➡️ Anche qui: **http://localhost:3000**
+
+---
+
+## 🔌 Backend & API
+
+Tutte le chiamate passano da un **unico data layer** ([`lib/api.ts`](lib/api.ts)) che usa `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). Il repo fornisce un'implementazione **reale** ([`server.mjs`](server.mjs)) e una **mock** ([`mock-api.mjs`](mock-api.mjs)) — entrambe rispettano questo contratto:
+
+Il frontend si aspetta queste rotte:
+
+| Metodo | Endpoint | Scopo |
+|---|---|---|
+| `GET` | `/api/v1/devices` | Elenco dispositivi |
+| `GET` | `/api/v1/devices/:ip` | Dettaglio dispositivo |
+| `PATCH` | `/api/v1/devices/:ip` | Aggiorna (es. hostname) |
+| `POST` | `/api/v1/scan/network?subnet=...` | Avvia scansione rete |
+| `POST` | `/api/v1/scan/ports/:ip` | Avvia scansione porte |
+| `GET` | `/api/v1/agents` | Agent registrati (scanner locale) |
+| `DELETE` | `/api/v1/agents/:id` | Rimuove un agent |
+| `GET` | `/api/v1/traffic` | Serie temporale traffico reale (KB/s + pacchetti/s + totali) |
+| `GET` | `/api/v1/connections` | Connessioni attive: protocollo, sorgente, destinazione (reverse DNS) |
+
+**Modello dati** (`types/index.ts`):
+
+```ts
+interface Device {
+  id: number;
+  ip_address: string;
+  mac_address: string | null;
+  hostname: string | null;
+  vendor: string | null;
+  is_active: boolean;
+  last_seen: string;
+  device_type: string;   // gateway | router | server | mobile | printer | iot_device | ...
+  open_ports: number[];
+}
 ```
 
 ---
 
-## ⚙️ Configurazione
+## 🗺️ Roadmap
 
-Crea un file `.env.local` nella root:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-| Variabile | Default | Descrizione |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | URL del backend FastAPI |
-
----
-
-## 🔌 API Backend
-
-Il frontend si aspetta le seguenti API dal backend:
-
-| Metodo | Endpoint | Descrizione |
-|---|---|---|
-| `GET` | `/api/v1/devices` | Lista tutti i dispositivi |
-| `GET` | `/api/v1/devices/:ip` | Dettaglio singolo dispositivo |
-| `PATCH` | `/api/v1/devices/:ip` | Aggiorna un dispositivo |
-| `POST` | `/api/v1/scan/network?subnet=` | Avvia scansione rete |
-| `POST` | `/api/v1/scan/ports/:ip` | Avvia port scan |
+- [x] 🛰️ **Backend di scansione reale** (`server.mjs`) — ping-sweep, ARP, reverse DNS, OUI, port scan
+- [x] 🧠 **Identificazione dispositivi** (telefoni, AP, NAS, inverter, EV, Docker, IoT…)
+- [x] 📈 **Traffico reale** (throughput + pacchetti/s dai contatori interfaccia)
+- [x] 🌙 **Dark/light mode** funzionante via toggle navbar
+- [x] 🧪 Mock backend a zero dipendenze per il collaudo della GUI
+- [ ] 📦 Database OUI completo offline (vendor sempre risolti senza internet)
+- [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
+- [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi
+- [ ] 🧪 Test automatici (Vitest + Playwright)
+- [ ] 🔐 Autenticazione e multi-utente
+- [ ] 🐳 `docker-compose` frontend + backend con un comando
 
 ---
 
-## 🛠️ Stack Tecnologico
+## 📜 Licenza
 
-| Layer | Tecnologia |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Linguaggio | TypeScript |
-| Styling | Tailwind CSS |
-| Icone | Lucide React |
-| Charts | Recharts |
-| Containerization | Docker |
-
----
-
-## 📄 Licenza
-
-MIT — vedi [LICENSE](LICENSE) per i dettagli.
-
----
+Distribuito sotto licenza **MIT**. Usalo, modificalo, miglioralo. ⭐ Se ti è utile, lascia una stella!
 
 <div align="center">
-Made with ❤️ by <a href="https://github.com/Lorenzozero">Lorenzozero</a>
+<br/>
+<sub>Costruito con ⚛️ Next.js, ❤️ e un sano sospetto verso i dispositivi sconosciuti sulla rete.</sub>
 </div>

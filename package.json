@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backend": "node server.mjs",
+    "mock": "node mock-api.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.556.0",

@@ -2,14 +2,14 @@
 
 import { Device } from '@/types';
 import {
-    Router, Laptop, Smartphone, Server, Printer, HelpCircle, Network,
-    ZoomIn, ZoomOut, Move, Info, X, Shield, Globe, Activity
+    Router, Laptop, Smartphone, Server, Printer, HelpCircle,
+    ZoomIn, ZoomOut, Move, Info, X, Activity,
+    Wifi, HardDrive, Camera, SunMedium, Zap, Tv, Box
 } from 'lucide-react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 // Tipi per la gestione della mappa
 interface Point { x: number; y: number }
-interface NodePosition extends Point { id: string }
 
 export default function TopologyMap({ devices, className }: { devices: Device[]; className?: string }) {
     // Stati per la gestione interfaccia
@@ -68,7 +68,9 @@ export default function TopologyMap({ devices, className }: { devices: Device[];
             }
         });
 
-        // Mantieni posizioni manuali se esistono (per drag)
+        // Mantieni posizioni manuali se esistono (per drag).
+        // setState in effect è voluto: il layout va ricalcolato quando cambia la lista device.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNodePositions(prev => ({ ...newPositions, ...prev }));
     }, [devices]);
 
@@ -127,13 +129,26 @@ export default function TopologyMap({ devices, className }: { devices: Device[];
 
     const getDeviceIcon = (device?: Device) => {
         if (!device) return HelpCircle;
-        const type = device.device_type;
-        if (type === 'router' || type === 'gateway') return Router;
-        if (type === 'server' || type === 'database_server') return Server;
-        if (type === 'mobile') return Smartphone;
-        if (type === 'printer') return Printer;
-        if (type === 'iot_device') return Activity;
-        return Laptop;
+        switch (device.device_type) {
+            case 'router':
+            case 'gateway': return Router;
+            case 'access_point': return Wifi;
+            case 'server':
+            case 'database_server':
+            case 'vm': return Server;
+            case 'nas': return HardDrive;
+            case 'mobile':
+            case 'tablet': return Smartphone;
+            case 'printer': return Printer;
+            case 'camera': return Camera;
+            case 'inverter': return SunMedium;
+            case 'ev_charger': return Zap;
+            case 'media':
+            case 'tv': return Tv;
+            case 'container': return Box;
+            case 'iot_device': return Activity;
+            default: return Laptop;
+        }
     };
 
     // Helper per trovare il nodo "Router" per le linee
@@ -285,8 +300,26 @@ export default function TopologyMap({ devices, className }: { devices: Device[];
                                 <div className="font-mono text-gray-900 dark:text-white">{selectedDevice.ip_address}</div>
                                 <div className="text-gray-500 dark:text-gray-400">MAC:</div>
                                 <div className="font-mono text-gray-900 dark:text-white truncate" title={selectedDevice.mac_address || undefined}>{selectedDevice.mac_address}</div>
-                                <div className="text-gray-500 dark:text-gray-400">Role:</div>
-                                <div className="capitalize text-indigo-600 dark:text-indigo-400 font-medium">{selectedDevice.device_type}</div>
+                                <div className="text-gray-500 dark:text-gray-400">Tipo:</div>
+                                <div className="capitalize text-indigo-600 dark:text-indigo-400 font-medium">{selectedDevice.device_type?.replace('_', ' ')}</div>
+                                {selectedDevice.os && <>
+                                    <div className="text-gray-500 dark:text-gray-400">OS:</div>
+                                    <div className="text-gray-900 dark:text-white">{selectedDevice.os}</div>
+                                </>}
+                                {selectedDevice.vendor && <>
+                                    <div className="text-gray-500 dark:text-gray-400">Vendor:</div>
+                                    <div className="text-gray-900 dark:text-white truncate" title={selectedDevice.vendor}>{selectedDevice.vendor}</div>
+                                </>}
+                                {typeof selectedDevice.latency === 'number' && <>
+                                    <div className="text-gray-500 dark:text-gray-400">Latenza:</div>
+                                    <div className="text-gray-900 dark:text-white">{selectedDevice.latency} ms</div>
+                                </>}
+                                {selectedDevice.risk && selectedDevice.risk.level !== 'ok' && <>
+                                    <div className="text-gray-500 dark:text-gray-400">Rischio:</div>
+                                    <div className={`font-semibold ${selectedDevice.risk.level === 'alto' ? 'text-red-500' : selectedDevice.risk.level === 'medio' ? 'text-orange-500' : 'text-yellow-500'}`}>
+                                        {selectedDevice.risk.level} ({selectedDevice.risk.score})
+                                    </div>
+                                </>}
                             </div>
                             {selectedDevice.open_ports && selectedDevice.open_ports.length > 0 && (
                                 <div className="pt-2 border-t border-gray-100 dark:border-gray-700">

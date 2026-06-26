@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Device } from '@/types';
-import { Pencil, Save, X, Server, Globe, Check, Edit2 } from 'lucide-react';
+import { Pencil, X, Check, Edit2 } from 'lucide-react';
 import { Activity } from 'lucide-react';
 
 interface NetworkGroupProps {

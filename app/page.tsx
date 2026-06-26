@@ -2,12 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import Layout from '@/components/Layout';
-import DeviceList from '@/components/DeviceList';
-import TrafficChart from '@/components/TrafficChart';
 import TopologyMap from '@/components/TopologyMap';
 import NetworkGroup from '@/components/NetworkGroup';
-import { fetchDevices, triggerNetworkScan } from '@/lib/api';
+import KpiDetailModal from '@/components/KpiDetailModal';
+
+// Caricato solo lato client: Recharts ha bisogno di un container misurabile,
+// non disponibile durante il render SSR. Evita il warning width(-1)/height(-1).
+const TrafficChart = dynamic(() => import('@/components/TrafficChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full min-h-[300px] flex items-center justify-center text-sm text-gray-400">
+      Caricamento grafico…
+    </div>
+  ),
+});
+import { fetchDevices, triggerNetworkScan, updateDevice } from '@/lib/api';
 import { Device } from '@/types';
 import {
   Activity, Server, Shield, Wifi,
@@ -16,9 +27,9 @@ import {
 
 export default function Home() {
   const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<string>('Pronto');
+  const [detail, setDetail] = useState<'total' | 'online' | 'networks' | 'alerts' | null>(null);
 
   const loadDevices = async () => {
     try {
@@ -26,15 +37,17 @@ export default function Home() {
       setDevices(data);
     } catch (error) {
       console.error('Errore nel caricamento dispositivi', error);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Fetch asincrono on-mount + polling: lo setState avviene dopo l'await,
+    // quindi non innesca i render a cascata che la regola vuole evitare.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDevices();
     const interval = setInterval(loadDevices, 10000);
-    return () => clearInterval(interval);
+    window.addEventListener('ns:refresh', loadDevices);
+    return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadDevices); };
   }, []);
 
   const handleScanNetwork = async () => {
@@ -51,7 +64,7 @@ export default function Home() {
         setScanStatus('Pronto');
         loadDevices();
       }, 10000);
-    } catch (error) {
+    } catch {
       setScanStatus('Errore scansione');
       setTimeout(() => setScanning(false), 3000);
     }
@@ -61,9 +74,9 @@ export default function Home() {
   const activeDevices = devices.filter(d => d.is_active).length;
   const activePercentage = devices.length > 0 ? Math.round((activeDevices / devices.length) * 100) : 0;
 
-  // Identifica potenziali problemi (mock logic based on real data)
-  const devicesWithManyPorts = devices.filter(d => (d.open_ports?.length || 0) > 5).length;
-  const unknownVendors = devices.filter(d => d.vendor === 'Unknown' || !d.vendor).length;
+  // Avvisi basati sul risk score reale calcolato dal backend
+  const riskyDevices = devices.filter(d => d.risk && d.risk.level !== 'ok').length;
+  const highRisk = devices.filter(d => d.risk && d.risk.level === 'alto').length;
 
   // Raggruppa dispositivi per Subnet (es. 192.168.1.0/24)
   const groupedDevices = devices.reduce((acc, device) => {
@@ -76,11 +89,7 @@ export default function Home() {
 
   const handleUpdateDevice = async (ip: string, updates: Partial<Device>) => {
     try {
-      await fetch(`http://localhost:8000/api/v1/devices/${ip}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
+      await updateDevice(ip, updates);
       loadDevices(); // Reload to see changes
     } catch (e) {
       console.error("Update failed", e);
@@ -143,7 +152,8 @@ export default function Home() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Total Devices */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+        <div onClick={() => setDetail('total')} role="button" tabIndex={0}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-indigo-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Server className="w-24 h-24 text-indigo-600 dark:text-indigo-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -166,7 +176,8 @@ export default function Home() {
         </div>
 
         {/* Active Devices */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+        <div onClick={() => setDetail('online')} role="button" tabIndex={0}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-green-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Zap className="w-24 h-24 text-green-600 dark:text-green-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -186,7 +197,8 @@ export default function Home() {
         </div>
 
         {/* Networks */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+        <div onClick={() => setDetail('networks')} role="button" tabIndex={0}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-blue-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Wifi className="w-24 h-24 text-blue-600 dark:text-blue-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -206,24 +218,25 @@ export default function Home() {
         </div>
 
         {/* Security Alerts */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
+        <div onClick={() => setDetail('alerts')} role="button" tabIndex={0}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-orange-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Shield className="w-24 h-24 text-orange-600 dark:text-orange-400 transform translate-x-4 -translate-y-4" />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avvisi</p>
-              <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{unknownVendors + devicesWithManyPorts}</p>
+              <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{riskyDevices}</p>
             </div>
             <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
-            <span className="flex items-center text-orange-600 dark:text-orange-400 mr-2">
-              {devicesWithManyPorts}
+            <span className="flex items-center text-red-600 dark:text-red-400 mr-2 font-semibold">
+              {highRisk}
             </span>
-            <span className="truncate">porte aperte anomale</span>
+            <span className="truncate">a rischio alto</span>
           </div>
         </div>
       </div>
@@ -288,6 +301,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {detail && <KpiDetailModal kind={detail} devices={devices} onClose={() => setDetail(null)} />}
     </Layout>
   );
 }

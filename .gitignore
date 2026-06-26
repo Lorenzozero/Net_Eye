@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# backend scanner cache (vendor lookups)
+.vendor-cache.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

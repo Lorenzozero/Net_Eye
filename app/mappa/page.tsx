@@ -24,7 +24,8 @@ export default function MappaPage() {
     useEffect(() => {
         loadDevices();
         const interval = setInterval(loadDevices, 15000);
-        return () => clearInterval(interval);
+        window.addEventListener('ns:refresh', loadDevices);
+        return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadDevices); };
     }, []);
 
     return (

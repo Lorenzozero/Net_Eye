@@ -25,7 +25,8 @@ export default function DispositiviPage() {
     useEffect(() => {
         loadDevices();
         const interval = setInterval(loadDevices, 10000);
-        return () => clearInterval(interval);
+        window.addEventListener('ns:refresh', loadDevices);
+        return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadDevices); };
     }, []);
 
     // Calculate stats
@@ -46,7 +47,7 @@ export default function DispositiviPage() {
                     Dispositivi di Rete
                 </h2>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Gestione completa dell'inventario e analisi di sicurezza
+                    Gestione completa dell&apos;inventario e analisi di sicurezza
                 </p>
             </div>
 

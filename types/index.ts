@@ -8,9 +8,26 @@ export interface Device {
     last_seen: string;
     device_type: string;
     open_ports: number[];
+    os?: string | null;
+    ttl?: number | null;
+    latency?: number | null;
+    banners?: Record<string, string> | null;
+    upnp?: { friendlyName?: string | null; model?: string | null; manufacturer?: string | null; server?: string | null } | null;
+    risk?: { score: number; level: string; reasons: string[] } | null;
 }
 
 export interface ScanResult {
     message: string;
     task_id: string;
+}
+
+export interface Agent {
+    agent_id: string;
+    agent_ip: string;
+    agent_hostname: string;
+    agent_os: string;
+    agent_version: string;
+    status: string;
+    last_seen: string;
+    registered_at: string;
 }

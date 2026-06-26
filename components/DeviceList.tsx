@@ -4,13 +4,20 @@ import { Device } from '@/types';
 import { triggerPortScan } from '@/lib/api';
 import { useState } from 'react';
 import {
-    Search, Server, Wifi, Smartphone, Laptop, Monitor,
-    MoreVertical, Shield, Globe, Terminal, Activity
+    Search, Server, Wifi, Smartphone, Monitor, Router, Printer,
+    HardDrive, Camera, SunMedium, Zap, Tv, Box, Activity,
+    Shield, Globe, Terminal
 } from 'lucide-react';
 
 interface DeviceListProps {
     devices: Device[];
 }
+
+const riskCls = (level: string) =>
+    level === 'alto' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+        : level === 'medio' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+            : level === 'basso' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
 
 export default function DeviceList({ devices }: DeviceListProps) {
     const [scanning, setScanning] = useState<string | null>(null);
@@ -28,11 +35,27 @@ export default function DeviceList({ devices }: DeviceListProps) {
         }
     };
 
-    const getDeviceIcon = (vendor: string | undefined, type: string) => {
-        // Simple heuristic for icons
-        if (type === 'router' || type === 'access_point') return <Wifi className="w-5 h-5" />;
-        if (vendor?.toLowerCase().includes('apple')) return <Smartphone className="w-5 h-5" />; // Or Laptop
-        return <Monitor className="w-5 h-5" />; // Default
+    const getDeviceIcon = (vendor: string | null | undefined, type: string) => {
+        const cls = "w-5 h-5";
+        switch (type) {
+            case 'gateway':
+            case 'router': return <Router className={cls} />;
+            case 'access_point': return <Wifi className={cls} />;
+            case 'server':
+            case 'vm': return <Server className={cls} />;
+            case 'nas': return <HardDrive className={cls} />;
+            case 'mobile':
+            case 'tablet': return <Smartphone className={cls} />;
+            case 'printer': return <Printer className={cls} />;
+            case 'camera': return <Camera className={cls} />;
+            case 'inverter': return <SunMedium className={cls} />;
+            case 'ev_charger': return <Zap className={cls} />;
+            case 'media':
+            case 'tv': return <Tv className={cls} />;
+            case 'container': return <Box className={cls} />;
+            case 'iot_device': return <Activity className={cls} />;
+            default: return <Monitor className={cls} />;
+        }
     };
 
     const filteredDevices = devices.filter(device =>
@@ -119,14 +142,28 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="inline-flex items-center gap-1 text-xs font-medium capitalize px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 w-fit">
+                                                {device.device_type?.replace('_', ' ') || 'sconosciuto'}
+                                                {device.os ? ` · ${device.os}` : ''}
+                                            </span>
                                             <span className="text-sm text-gray-900 dark:text-white">{device.vendor || 'Vendor Sconosciuto'}</span>
-                                            {device.open_ports && device.open_ports.length > 0 && (
-                                                <span className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center mt-1">
-                                                    <Terminal className="w-3 h-3 mr-1" />
-                                                    {device.open_ports.length} porte aperte
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                {device.open_ports && device.open_ports.length > 0 && (
+                                                    <span className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center">
+                                                        <Terminal className="w-3 h-3 mr-1" />
+                                                        {device.open_ports.length} porte
+                                                    </span>
+                                                )}
+                                                {typeof device.latency === 'number' && (
+                                                    <span className="text-xs text-gray-400">{device.latency} ms</span>
+                                                )}
+                                                {device.risk && device.risk.level !== 'ok' && (
+                                                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${riskCls(device.risk.level)}`}>
+                                                        rischio {device.risk.level}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -223,7 +260,21 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase">Tipo</label>
-                                                    <span className="text-sm capitalize text-indigo-600 dark:text-indigo-400">{selectedDevice.device_type}</span>
+                                                    <span className="text-sm capitalize text-indigo-600 dark:text-indigo-400">{selectedDevice.device_type?.replace('_', ' ')}</span>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Sistema (OS)</label>
+                                                    <span className="text-sm text-gray-900 dark:text-white">{selectedDevice.os || 'N/A'}{selectedDevice.ttl ? ` · TTL ${selectedDevice.ttl}` : ''}</span>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Latenza</label>
+                                                    <span className="text-sm text-gray-900 dark:text-white">{typeof selectedDevice.latency === 'number' ? `${selectedDevice.latency} ms` : 'N/A'}</span>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Rischio</label>
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${riskCls(selectedDevice.risk?.level || 'ok')}`}>
+                                                        {selectedDevice.risk ? `${selectedDevice.risk.level} (${selectedDevice.risk.score})` : 'ok'}
+                                                    </span>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase">Stato</label>
@@ -232,6 +283,37 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                                     </span>
                                                 </div>
                                             </div>
+
+                                            {selectedDevice.risk && selectedDevice.risk.reasons.length > 0 && (
+                                                <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10 p-3">
+                                                    <label className="block text-xs font-bold text-orange-700 dark:text-orange-300 uppercase mb-1">⚠️ Evidenze di rischio</label>
+                                                    <ul className="list-disc list-inside text-xs text-orange-700 dark:text-orange-300">
+                                                        {selectedDevice.risk.reasons.map((r, i) => <li key={i}>{r}</li>)}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {selectedDevice.banners && Object.keys(selectedDevice.banners).length > 0 && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Servizi rilevati (banner)</label>
+                                                    <div className="space-y-1">
+                                                        {Object.entries(selectedDevice.banners).map(([port, b]) => (
+                                                            <div key={port} className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/40 rounded px-2 py-1">
+                                                                <span className="text-indigo-500">:{port}</span> {b}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {selectedDevice.upnp && (selectedDevice.upnp.friendlyName || selectedDevice.upnp.model || selectedDevice.upnp.manufacturer) && (
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">UPnP / SSDP</label>
+                                                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                                                        {[selectedDevice.upnp.friendlyName, selectedDevice.upnp.model, selectedDevice.upnp.manufacturer].filter(Boolean).join(' · ')}
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Porte Aperte (Scansione)</label>

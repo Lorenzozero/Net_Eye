@@ -11,40 +11,32 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Legge la preferenza salvata o quella di sistema. Eseguita solo lato client.
+function resolveInitialTheme(): Theme {
+    const savedTheme = localStorage.getItem('theme') as Theme | null;
+    if (savedTheme) return savedTheme;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const [theme, setTheme] = useState<Theme>('light');
-    const [mounted, setMounted] = useState(false);
 
+    // Sincronizza il tema iniziale dal client dopo il mount: localStorage e
+    // matchMedia non sono disponibili in SSR, quindi qui setState è necessario.
     useEffect(() => {
-        setMounted(true);
-        // Carica il tema salvato o usa la preferenza del sistema
-        const savedTheme = localStorage.getItem('theme') as Theme;
-        if (savedTheme) {
-            setTheme(savedTheme);
-        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setTheme('dark');
-        }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- init client-only (vedi commento)
+        setTheme(resolveInitialTheme());
     }, []);
 
+    // Applica il tema al DOM e lo persiste: sincronizzazione con sistemi esterni.
     useEffect(() => {
-        if (!mounted) return;
-
-        const root = document.documentElement;
-        if (theme === 'dark') {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
+        document.documentElement.classList.toggle('dark', theme === 'dark');
         localStorage.setItem('theme', theme);
-    }, [theme, mounted]);
+    }, [theme]);
 
     const toggleTheme = () => {
         setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
-
-    if (!mounted) {
-        return <>{children}</>;
-    }
 
     return (
         <ThemeContext.Provider value={{ theme, toggleTheme }}>

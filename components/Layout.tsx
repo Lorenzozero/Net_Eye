@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Eye, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import NavActions from '@/components/NavActions';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -13,6 +14,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         { name: 'Dashboard', href: '/' },
         { name: 'Dispositivi', href: '/dispositivi' },
         { name: 'Mappa', href: '/mappa' },
+        { name: 'Traffico', href: '/traffico' },
         { name: 'Impostazioni', href: '/impostazioni' },
     ];
 
@@ -44,7 +46,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 })}
                             </div>
                         </div>
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-2">
+                            <NavActions />
                             <button
                                 onClick={toggleTheme}
                                 className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"

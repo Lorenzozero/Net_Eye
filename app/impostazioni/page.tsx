@@ -3,62 +3,50 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { useTheme } from '@/contexts/ThemeContext';
+import { fetchAgents, deleteAgent } from '@/lib/api';
+import { Agent } from '@/types';
 import {
-    Save, Network, Bell, Shield, Cpu, Terminal, Download,
+    Save, Bell, Shield, Cpu, Terminal, Download,
     Monitor, Server, RefreshCw, Trash2, CheckCircle, XCircle, Clock
 } from 'lucide-react';
-
-interface Agent {
-    agent_id: string;
-    agent_ip: string;
-    agent_hostname: string;
-    agent_os: string;
-    agent_version: string;
-    status: string;
-    last_seen: string;
-    registered_at: string;
-}
 
 export default function ImpostazioniPage() {
     const { theme, toggleTheme } = useTheme();
     const [agents, setAgents] = useState<Agent[]>([]);
-    const [loading, setLoading] = useState(false);
     const [serverUrl, setServerUrl] = useState('http://localhost:8000');
     const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            setServerUrl(`http://${window.location.hostname}:8000`);
-        }
-        fetchAgents();
-        const interval = setInterval(fetchAgents, 15000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchAgents = async () => {
+    const loadAgents = async () => {
         try {
-            const res = await fetch('http://localhost:8000/api/v1/agents');
-            if (res.ok) {
-                const data = await res.json();
-                setAgents(data.agents || []);
-            }
-        } catch (e) {
+            setAgents(await fetchAgents());
+        } catch {
             console.log('Errore caricamento agents');
         }
     };
 
-    const deleteAgent = async (agentId: string) => {
+    const removeAgent = async (agentId: string) => {
         if (!confirm('Sei sicuro di voler rimuovere questo agent?')) return;
         try {
-            await fetch(`http://localhost:8000/api/v1/agents/${agentId}`, { method: 'DELETE' });
-            fetchAgents();
+            await deleteAgent(agentId);
+            loadAgents();
             setToast({ msg: 'Agent rimosso con successo', type: 'success' });
             setTimeout(() => setToast(null), 3000);
-        } catch (e) {
+        } catch {
             setToast({ msg: 'Errore durante la rimozione dell\'agent', type: 'error' });
             setTimeout(() => setToast(null), 3000);
         }
     };
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- hostname disponibile solo lato client
+            setServerUrl(`http://${window.location.hostname}:8000`);
+        }
+        loadAgents();
+        const interval = setInterval(loadAgents, 15000);
+        window.addEventListener('ns:refresh', loadAgents);
+        return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadAgents); };
+    }, []);
 
     const downloadFile = (type: 'windows' | 'linux' | 'python') => {
         const filenames = {
@@ -92,7 +80,7 @@ export default function ImpostazioniPage() {
         }
     };
 
-    const getStatusInfo = (status: string, lastSeen: string) => {
+    const getStatusInfo = (status: string) => {
         const isOnline = status === 'online';
         return {
             icon: isOnline ? CheckCircle : XCircle,
@@ -110,7 +98,7 @@ export default function ImpostazioniPage() {
                     Impostazioni
                 </h2>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Configura gli agent di scansione e le preferenze dell'applicazione
+                    Configura gli agent di scansione e le preferenze dell&apos;applicazione
                 </p>
             </div>
 
@@ -128,7 +116,7 @@ export default function ImpostazioniPage() {
                             </div>
                         </div>
                         <button
-                            onClick={fetchAgents}
+                            onClick={loadAgents}
                             className="p-2 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                             title="Aggiorna lista"
                         >
@@ -236,7 +224,7 @@ export default function ImpostazioniPage() {
                                     </thead>
                                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                         {agents.map((agent) => {
-                                            const statusInfo = getStatusInfo(agent.status, agent.last_seen);
+                                            const statusInfo = getStatusInfo(agent.status);
                                             const StatusIcon = statusInfo.icon;
                                             return (
                                                 <tr key={agent.agent_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
@@ -269,7 +257,7 @@ export default function ImpostazioniPage() {
                                                     </td>
                                                     <td className="px-4 py-4 whitespace-nowrap text-right">
                                                         <button
-                                                            onClick={() => deleteAgent(agent.agent_id)}
+                                                            onClick={() => removeAgent(agent.agent_id)}
                                                             className="text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors p-1"
                                                             title="Rimuovi agent"
                                                         >
@@ -297,7 +285,7 @@ export default function ImpostazioniPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Modalità Scura</label>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Cambia il tema dell'interfaccia</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Cambia il tema dell&apos;interfaccia</p>
                         </div>
                         <button
                             onClick={toggleTheme}
