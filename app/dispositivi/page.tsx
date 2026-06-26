@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import DeviceList from '@/components/DeviceList';
 import { fetchDevices } from '@/lib/api';
+import { exportDevicesCsv, exportDevicesPdf } from '@/lib/export';
 import { Device } from '@/types';
-import { Server, Wifi, Activity, Shield } from 'lucide-react';
+import { Server, Wifi, Activity, Shield, Download, FileText } from 'lucide-react';
 
 export default function DispositiviPage() {
     const [devices, setDevices] = useState<Device[]>([]);
@@ -42,13 +43,31 @@ export default function DispositiviPage() {
 
     return (
         <Layout>
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl">
-                    Dispositivi di Rete
-                </h2>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Gestione completa dell&apos;inventario e analisi di sicurezza
-                </p>
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl">
+                        Dispositivi di Rete
+                    </h2>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        Gestione completa dell&apos;inventario e analisi di sicurezza
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => exportDevicesCsv(devices)}
+                        disabled={devices.length === 0}
+                        className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                        <Download className="w-4 h-4 mr-2" /> CSV
+                    </button>
+                    <button
+                        onClick={() => exportDevicesPdf(devices)}
+                        disabled={devices.length === 0}
+                        className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
+                    >
+                        <FileText className="w-4 h-4 mr-2" /> PDF
+                    </button>
+                </div>
             </div>
 
             {/* Stats Overview */}

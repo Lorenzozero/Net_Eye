@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "backend": "node server.mjs",
-    "mock": "node mock-api.mjs"
+    "mock": "node mock-api.mjs",
+    "oui": "node scripts/fetch-oui.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.556.0",

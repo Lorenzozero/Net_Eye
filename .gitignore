@@ -39,6 +39,9 @@ yarn-error.log*
 # backend scanner cache (vendor lookups)
 .vendor-cache.json
 
+# database OUI IEEE generato (rigenerabile con: npm run oui)
+oui-db.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

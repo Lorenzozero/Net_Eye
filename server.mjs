@@ -96,6 +96,12 @@ const OUI = {
   '00155D': 'Microsoft Hyper-V', '0242AC': 'Docker',
 };
 
+// Database OUI IEEE completo (opzionale): generalo con `npm run oui`.
+const OUI_DB = (() => {
+  try { return JSON.parse(readFileSync(new URL('./oui-db.json', import.meta.url), 'utf8')); }
+  catch { return null; }
+})();
+
 // ---- stato ----
 let devices = [];
 let scanning = false;
@@ -194,7 +200,7 @@ function isRandomMac(mac) {
 function ouiVendor(mac) {
   if (!mac) return null;
   const prefix = mac.replace(/[^0-9a-f]/gi, '').toUpperCase().slice(0, 6);
-  return OUI[prefix] || null;
+  return OUI[prefix] || (OUI_DB ? OUI_DB[prefix] : null) || null;  // inline (nomi corti) → DB IEEE completo
 }
 
 function onlineVendor(mac) {
@@ -736,7 +742,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`🛰️  NetworkScope backend v2 su http://localhost:${PORT}`);
-  console.log(`   Subnet: ${local.base}.0/24 · host: ${local.ip} · OUI offline: ${Object.keys(OUI).length} · cache: ${vendorCache.size}`);
+  console.log(`   Subnet: ${local.base}.0/24 · host: ${local.ip} · OUI: ${Object.keys(OUI).length}${OUI_DB ? ` + DB IEEE ${Object.keys(OUI_DB).length}` : ' (esegui npm run oui per il DB completo)'} · cache: ${vendorCache.size}`);
   scanNetwork();
   setInterval(scanNetwork, 60_000);
   sampleTraffic();                       // primo campione traffico

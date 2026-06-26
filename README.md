@@ -82,6 +82,9 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🔗 **Analisi flussi/connessioni** — `netstat` mostra le connessioni attive con **protocollo** (HTTPS, DNS, SSH…), **da quale dispositivo** e **verso quale destinazione** (reverse DNS: github.com, Google, Telegram…), in tabella e su **mappa dei flussi**.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online/Reti/Avvisi aprono un modale con dettagli ed **evidenze** (es. quali host hanno porte anomale e perché).
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
+- 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
+- 🏷️ **Vendor 100% offline** — database **OUI IEEE completo** (~40k vendor) via `npm run oui`: niente più "Unknown" anche senza internet.
+- 📤 **Export CSV / PDF** — esporta l'inventario completo (IP, MAC, vendor, tipo, OS, porte, rischio) dalla pagina Dispositivi.
 
 ---
 
@@ -169,6 +172,7 @@ npm run dev
 |---|---|
 | `npm run backend` | 🛰️ Backend di scansione **reale** della rete (porta 8000) |
 | `npm run mock` | 🧪 Backend finto con dati demo (porta 8000) |
+| `npm run oui` | 🏷️ Scarica il DB OUI IEEE completo (~40k vendor) per la risoluzione offline |
 | `npm run dev` | Server di sviluppo frontend con hot-reload |
 | `npm run build` | Build di produzione |
 | `npm start` | Avvia la build di produzione |
@@ -307,7 +311,8 @@ interface Device {
 - [x] 📈 **Traffico reale** (throughput + pacchetti/s dai contatori interfaccia)
 - [x] 🌙 **Dark/light mode** funzionante via toggle navbar
 - [x] 🧪 Mock backend a zero dipendenze per il collaudo della GUI
-- [ ] 📦 Database OUI completo offline (vendor sempre risolti senza internet)
+- [x] 📦 Database OUI completo offline (~40k vendor, `npm run oui`)
+- [x] 📤 Export report CSV / PDF
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi
 - [ ] 🧪 Test automatici (Vitest + Playwright)
