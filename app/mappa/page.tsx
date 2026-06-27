@@ -31,11 +31,11 @@ export default function MappaPage() {
     return (
         <Layout>
             {loading ? (
-                <div className="flex justify-center items-center h-96">
+                <div className="flex justify-center items-center h-[60vh]">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                 </div>
             ) : (
-                <div className="absolute inset-0 top-24 left-0 right-0 bottom-0 bg-gray-100 dark:bg-gray-900">
+                <div className="h-[calc(100vh-8rem)] rounded-2xl overflow-hidden border border-slate-200/70 dark:border-white/10">
                     <TopologyMap
                         devices={devices}
                         className="h-full w-full rounded-none border-0 shadow-none"

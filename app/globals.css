@@ -58,11 +58,12 @@ body {
   background-clip: content-box;
 }
 
-/* Micro-animazione di ingresso per i contenuti */
-@keyframes ns-fade-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
+/* Micro-animazione di ingresso (solo opacità: NON crea un containing block,
+   così modali fixed e mappe absolute restano relativi al viewport). */
+@keyframes ns-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .ns-fade-up {
-  animation: ns-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ns-fade-in 0.4s ease both;
 }
