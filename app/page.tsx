@@ -194,7 +194,7 @@ export default function Home() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Left Column - Topology Map */}
         <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-slate-200/70 dark:border-white/10 h-full flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-slate-200/70 dark:border-white/10">
             <div className="p-5 border-b border-slate-200/70 dark:border-white/10 flex justify-between items-center">
               <h3 className="font-semibold text-gray-900 dark:text-white">Topologia Rete</h3>
               <Link href="/mappa" className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center">
@@ -202,14 +202,14 @@ export default function Home() {
                 <ArrowRight className="w-4 h-4 ml-1" />
               </Link>
             </div>
-            <div className="flex-1 min-h-[540px]">
+            <div className="h-[560px]">
               <TopologyMap devices={devices} className="h-full rounded-none border-0 shadow-none" />
             </div>
           </div>
         </div>
 
         {/* Right Column - Stato/Scan + Traffico */}
-        <div className="space-y-8 flex flex-col">
+        <div className="space-y-8">
           {/* Stato Sistema + Avvia Scansione */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">
             <div className="flex items-center justify-between mb-4">
@@ -245,7 +245,7 @@ export default function Home() {
           </div>
 
           {/* Traffic Monitor */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 flex-1 min-h-[380px] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 h-[400px] flex flex-col">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Traffico Rete</h3>
             <div className="flex-1">
               <TrafficChart />
