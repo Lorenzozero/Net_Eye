@@ -2,16 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { useTheme } from '@/contexts/ThemeContext';
 import { fetchAgents, deleteAgent } from '@/lib/api';
 import { Agent } from '@/types';
 import {
-    Save, Bell, Shield, Cpu, Terminal, Download,
+    Save, Bell, Cpu, Terminal, Download,
     Monitor, Server, RefreshCw, Trash2, CheckCircle, XCircle, Clock
 } from 'lucide-react';
 
 export default function ImpostazioniPage() {
-    const { theme, toggleTheme } = useTheme();
     const [agents, setAgents] = useState<Agent[]>([]);
     const [serverUrl, setServerUrl] = useState('http://localhost:8000');
     const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
@@ -81,30 +79,21 @@ export default function ImpostazioniPage() {
     };
 
     const getStatusInfo = (status: string) => {
-        const isOnline = status === 'online';
+        const isOnline = status === 'online' || status === 'scanning';
         return {
             icon: isOnline ? CheckCircle : XCircle,
             color: isOnline ? 'text-green-500' : 'text-red-500',
             bgColor: isOnline ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30',
             textColor: isOnline ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300',
-            label: isOnline ? 'Online' : 'Offline'
+            label: status === 'scanning' ? 'In scansione' : (isOnline ? 'Online' : 'Offline')
         };
     };
 
     return (
         <Layout>
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl">
-                    Impostazioni
-                </h2>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Configura gli agent di scansione e le preferenze dell&apos;applicazione
-                </p>
-            </div>
-
             <div className="space-y-6">
                 {/* Agent di Rete */}
-                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-slate-200/70 dark:border-white/10">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center">
                             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg mr-3">
@@ -134,7 +123,7 @@ export default function ImpostazioniPage() {
                             {/* Windows */}
                             <button
                                 onClick={() => downloadFile('windows')}
-                                className="flex items-center justify-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group"
+                                className="flex items-center justify-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200 group"
                             >
                                 <div className="text-center">
                                     <Monitor className="w-8 h-8 mx-auto mb-2 group-hover:scale-110 transition-transform" />
@@ -146,7 +135,7 @@ export default function ImpostazioniPage() {
                             {/* Linux/Ubuntu */}
                             <button
                                 onClick={() => downloadFile('linux')}
-                                className="flex items-center justify-center p-4 bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group"
+                                className="flex items-center justify-center p-4 bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200 group"
                             >
                                 <div className="text-center">
                                     <Server className="w-8 h-8 mx-auto mb-2 group-hover:scale-110 transition-transform" />
@@ -158,7 +147,7 @@ export default function ImpostazioniPage() {
                             {/* Python */}
                             <button
                                 onClick={() => downloadFile('python')}
-                                className="flex items-center justify-center p-4 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group"
+                                className="flex items-center justify-center p-4 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200 group"
                             >
                                 <div className="text-center">
                                     <Terminal className="w-8 h-8 mx-auto mb-2 group-hover:scale-110 transition-transform" />
@@ -274,30 +263,8 @@ export default function ImpostazioniPage() {
                     </div>
                 </div>
 
-                {/* Aspetto */}
-                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center mb-4">
-                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg mr-3">
-                            <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Aspetto</h3>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Modalità Scura</label>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Cambia il tema dell&apos;interfaccia</p>
-                        </div>
-                        <button
-                            onClick={toggleTheme}
-                            className={`${theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-300'} relative inline-flex h-7 w-12 items-center rounded-full transition-colors`}
-                        >
-                            <span className={`${theme === 'dark' ? 'translate-x-6' : 'translate-x-1'} inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform`} />
-                        </button>
-                    </div>
-                </div>
-
                 {/* Notifiche */}
-                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-slate-200/70 dark:border-white/10">
                     <div className="flex items-center mb-4">
                         <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg mr-3">
                             <Bell className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
@@ -324,7 +291,7 @@ export default function ImpostazioniPage() {
                             setToast({ msg: 'Impostazioni salvate con successo!', type: 'success' });
                             setTimeout(() => setToast(null), 3000);
                         }}
-                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200"
                     >
                         <Save className="w-5 h-5 mr-2" />
                         Salva Impostazioni

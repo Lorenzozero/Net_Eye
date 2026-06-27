@@ -1,7 +1,7 @@
 'use client';
 
 import { Connection } from '@/lib/api';
-import { Laptop, Globe, Server } from 'lucide-react';
+import { Laptop, Globe } from 'lucide-react';
 
 const short = (c: Connection) => {
     const name = c.remoteHost || c.remoteIp;

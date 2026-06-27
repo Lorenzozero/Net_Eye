@@ -43,15 +43,7 @@ export default function DispositiviPage() {
 
     return (
         <Layout>
-            <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl">
-                        Dispositivi di Rete
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        Gestione completa dell&apos;inventario e analisi di sicurezza
-                    </p>
-                </div>
+            <div className="mb-8 flex items-center justify-end gap-2">
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => exportDevicesCsv(devices)}
@@ -72,7 +64,7 @@ export default function DispositiviPage() {
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-slate-200/70 dark:border-white/10">
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
@@ -90,7 +82,7 @@ export default function DispositiviPage() {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-slate-200/70 dark:border-white/10">
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
@@ -108,7 +100,7 @@ export default function DispositiviPage() {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-slate-200/70 dark:border-white/10">
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
@@ -128,7 +120,7 @@ export default function DispositiviPage() {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-gray-100 dark:border-gray-700">
+                <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg border border-slate-200/70 dark:border-white/10">
                     <div className="p-5">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">

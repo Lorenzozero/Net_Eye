@@ -58,16 +58,22 @@ export default function DeviceList({ devices }: DeviceListProps) {
         }
     };
 
-    const filteredDevices = devices.filter(device =>
-        device.hostname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.ip_address.includes(searchTerm) ||
-        device.vendor?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const q = searchTerm.toLowerCase().trim();
+    const filteredDevices = devices.filter((device) => {
+        if (!q) return true;
+        const haystack = [
+            device.hostname, device.ip_address, device.vendor, device.device_type, device.os,
+            device.mac_address, (device.open_ports || []).join(' '),
+            device.banners ? Object.values(device.banners).join(' ') : '',
+            device.risk?.level,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(q);
+    });
 
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 
     return (
-        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden border border-slate-200/70 dark:border-white/10">
             {/* Header with Search */}
             <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center">
@@ -83,7 +89,7 @@ export default function DeviceList({ devices }: DeviceListProps) {
                     </div>
                     <input
                         type="text"
-                        placeholder="Cerca IP, nome o vendor..."
+                        placeholder="Cerca IP, nome, vendor, tipo, OS, porta, MAC..."
                         className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-indigo-500 w-full sm:w-64 transition-shadow"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}

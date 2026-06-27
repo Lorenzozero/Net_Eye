@@ -28,7 +28,7 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-100 dark:border-gray-700 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-slate-200/70 dark:border-white/10 mb-6">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
                 <div className="flex items-center space-x-3">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">

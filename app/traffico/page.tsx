@@ -26,7 +26,7 @@ const fmtBytes = (b: number) => {
 
 function Stat({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string; sub?: string; color: string }) {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5 border border-gray-100 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-5 border border-slate-200/70 dark:border-white/10">
             <div className="flex items-center justify-between">
                 <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
@@ -85,13 +85,6 @@ export default function TrafficoPage() {
 
     return (
         <Layout>
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl">Monitoraggio Traffico</h2>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Throughput e pacchetti di rete in tempo reale (contatori dell&apos;interfaccia, aggiornamento ogni 2s)
-                </p>
-            </div>
-
             {offline && (
                 <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
                     <AlertTriangle className="w-4 h-4" />
@@ -111,7 +104,7 @@ export default function TrafficoPage() {
                     sub={totals ? `↓ ${fmtBytes(totals.bytesIn)} · ↑ ${fmtBytes(totals.bytesOut)}` : undefined} />
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 mb-8">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Throughput (KB/s) — 🔵 download · 🟣 upload</h3>
                 <div className="h-[300px]">
                     <TrafficAreaChart data={history} dataKeys={['download', 'upload']} colors={['#0ea5e9', '#6366f1']}
@@ -119,7 +112,7 @@ export default function TrafficoPage() {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 mb-8">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Pacchetti al secondo — 🟢 ricevuti · 🟠 inviati</h3>
                 <div className="h-[260px]">
                     <TrafficAreaChart data={history} dataKeys={['rxPps', 'txPps']} colors={['#22c55e', '#f59e0b']}
@@ -129,7 +122,7 @@ export default function TrafficoPage() {
 
             {/* Flussi / connessioni attive */}
             <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
-                <div className="xl:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+                <div className="xl:col-span-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
                         <Network className="w-5 h-5 mr-2 text-indigo-500" /> Mappa flussi di rete attivi
                     </h3>
@@ -139,7 +132,7 @@ export default function TrafficoPage() {
                     </div>
                 </div>
 
-                <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700">
+                <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">
                     <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                         <Globe className="w-5 h-5 mr-2 text-indigo-500" /> Connessioni ({connections.length})
                     </h3>

@@ -105,9 +105,9 @@ const OUI_DB = (() => {
 // ---- stato ----
 let devices = [];
 let scanning = false;
-let lastScan = null;
 const traffic = [];        // serie temporale: { time, download(KB/s), upload(KB/s), rxPps, txPps }
 let lastCounters = null;   // ultimo snapshot dei contatori interfaccia
+const removedAgents = new Set(); // agenti eliminati dall'utente (non vengono ri-mostrati)
 const vendorCache = loadCache();
 const vendorQueue = [];
 let queueRunning = false;
@@ -556,7 +556,6 @@ async function scanNetwork() {
     });
     list.forEach((d) => (d.id = id++));
     devices = list;
-    lastScan = new Date().toISOString();
     const byType = list.reduce((a, d) => ((a[d.device_type] = (a[d.device_type] || 0) + 1), a), {});
     console.log(`✅ ${devices.length} dispositivi in ${((Date.now() - t0) / 1000).toFixed(1)}s →`,
       Object.entries(byType).map(([k, n]) => `${k}:${n}`).join(' '));
@@ -725,17 +724,19 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/api/v1/agents') {
-    return json(res, 200, {
-      agents: [{
-        agent_id: 'local-scanner', agent_ip: local.ip || '127.0.0.1', agent_hostname: os.hostname(),
-        agent_os: isWin ? 'Windows' : (process.platform === 'darwin' ? 'macOS' : 'Linux'),
-        agent_version: '2.0.0', status: scanning ? 'scanning' : 'online',
-        last_seen: lastScan || new Date().toISOString(), registered_at: new Date(startedAt).toISOString(),
-      }],
-    });
+    const agents = removedAgents.has('local-scanner') ? [] : [{
+      agent_id: 'local-scanner', agent_ip: local.ip || '127.0.0.1', agent_hostname: os.hostname(),
+      agent_os: isWin ? 'Windows' : (process.platform === 'darwin' ? 'macOS' : 'Linux'),
+      agent_version: '2.0.0', status: scanning ? 'scanning' : 'online',
+      last_seen: new Date().toISOString(), registered_at: new Date(startedAt).toISOString(),
+    }];
+    return json(res, 200, { agents });
   }
 
-  if (req.method === 'DELETE' && parts[2] === 'agents' && parts[3]) return json(res, 200, { message: 'ok' });
+  if (req.method === 'DELETE' && parts[2] === 'agents' && parts[3]) {
+    removedAgents.add(parts[3]);
+    return json(res, 200, { message: 'agente rimosso' });
+  }
 
   json(res, 404, { error: 'rotta non gestita' });
 });

@@ -30,6 +30,7 @@
 - [🚀 Funzionalità](#-funzionalità)
 - [🖼️ Le 4 schermate](#️-le-4-schermate)
 - [🏗️ Architettura](#️-architettura)
+- [🔬 Tecniche di monitoraggio](#-tecniche-di-monitoraggio)
 - [🧰 Stack tecnico](#-stack-tecnico)
 - [⚡ Avvio rapido](#-avvio-rapido)
 - [🧪 Come testare dalla GUI web](#-come-testare-dalla-gui-web)
@@ -128,6 +129,52 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 ```
 
 > 💡 **Nota:** il cuore è il frontend Next.js, ma il repo include anche un **backend di scansione reale** ([`server.mjs`](server.mjs), zero dipendenze) che popola la dashboard con i dispositivi veri della tua LAN, più un **mock** ([`mock-api.mjs`](mock-api.mjs)) per la demo offline. Base API configurabile via `NEXT_PUBLIC_API_URL`. Vedi [Come testare](#-come-testare-dalla-gui-web).
+
+---
+
+## 🔬 Tecniche di monitoraggio
+
+Tutte le tecniche sono **attive e reali**, implementate in `server.mjs` con i soli strumenti del sistema operativo — **zero dipendenze esterne e nessun privilegio di amministratore**.
+
+### 🔎 Scoperta dei dispositivi
+| Tecnica | Strumento | Cosa rileva |
+|---|---|---|
+| **ICMP ping-sweep** | `ping` su tutta la `/24` (a batch paralleli) | host attivi e raggiungibili |
+| **Lettura tabella ARP** | `arp -a` | MAC address dei dispositivi nella LAN |
+| **Re-scan automatico** | loop ogni 60s | comparsa/scomparsa dispositivi nel tempo |
+
+### 🧠 Identificazione e fingerprinting
+| Tecnica | Come funziona | Cosa rivela |
+|---|---|---|
+| **OS fingerprint via TTL** | analisi del TTL della risposta ICMP (64→Linux, 128→Windows, 255→embedded) | famiglia di sistema operativo |
+| **Latenza RTT** | tempo di risposta del ping | reattività/qualità del link |
+| **TCP connect scan** | apertura socket su porte note (set rapido + set profondo on-demand) | porte e servizi aperti |
+| **Banner grabbing** | lettura della banner su SSH/FTP/SMTP, header `Server:` HTTP, **certificato TLS** | servizio e **versione** reali (es. `OpenSSH 10.0`, `nginx`, CN del certificato) |
+| **Discovery SSDP/UPnP** | M-SEARCH multicast su `239.255.255.250:1900` + parsing dell'XML di descrizione | **nome, modello e produttore** (TV, router, NAS, media) |
+| **Risoluzione hostname** | reverse DNS → **NetBIOS** (`nbtstat`) → nome UPnP | nome host leggibile |
+| **Vendor via OUI** | tabella inline + **DB IEEE completo offline** (~40k) + lookup online throttolato e cachato | produttore della scheda di rete |
+| **MAC randomizzato** | rilevamento del bit *locally-administered* | smartphone con MAC privacy (iPhone/Android) |
+| **Classificazione tipo** | euristica combinata su porte + vendor + MAC + banner + UPnP + TTL | telefono, AP, NAS, stampante, camera, inverter, EV, Docker, IoT… |
+
+### 📈 Monitoraggio del traffico
+| Tecnica | Strumento | Cosa misura |
+|---|---|---|
+| **Contatori d'interfaccia** | `netstat -e` (Windows) · `/proc/net/dev` (Linux), campionati ogni 2s | **throughput** download/upload (KB/s–MB/s) e **pacchetti/s** in/out |
+| **Totali cumulativi** | delta dei contatori | byte e pacchetti totali trasferiti |
+
+### 🔗 Analisi dei flussi/connessioni
+| Tecnica | Strumento | Cosa mostra |
+|---|---|---|
+| **Tabella connessioni attive** | `netstat -ano` (stati ESTABLISHED) | flussi in corso da/verso l'host |
+| **Classificazione protocollo** | mappatura porta→servizio | HTTPS, DNS, SSH, MQTT, RTSP… (TCP/UDP) |
+| **Risoluzione destinazione** | reverse DNS degli IP remoti (cachato) | *dove* va il traffico (github.com, Google, Telegram…) |
+
+### 🛡️ Sicurezza
+| Tecnica | Logica | Output |
+|---|---|---|
+| **Security risk scoring** | porte pericolose esposte (Telnet, SMB, RDP, VNC, DB…) + n° porte + vendor ignoto | punteggio 0–100 e livello **basso/medio/alto** con evidenze |
+
+> ⚠️ **Limiti onesti:** l'analisi dei flussi riguarda la **macchina che esegue lo scanner** (la sua socket table); per vedere il traffico *di altri* dispositivi servirebbe una porta mirror/gateway o packet-capture. Il **deep packet inspection** per-protocollo richiederebbe Npcap + privilegi (in roadmap).
 
 ---
 

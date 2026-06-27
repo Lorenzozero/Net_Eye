@@ -30,15 +30,6 @@ export default function MappaPage() {
 
     return (
         <Layout>
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white sm:text-3xl">
-                    Mappa Topologia Rete
-                </h2>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Visualizzazione grafica della topologia di rete in stile Packet Tracer
-                </p>
-            </div>
-
             {loading ? (
                 <div className="flex justify-center items-center h-96">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>

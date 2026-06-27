@@ -98,62 +98,11 @@ export default function Home() {
 
   return (
     <Layout>
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-        <div>
-          <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-            Dashboard
-          </h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Panoramica in tempo reale della tua infrastruttura di rete
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="hidden md:flex flex-col items-end mr-2">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stato Sistema</span>
-            <div className="flex items-center text-sm font-medium text-green-600 dark:text-green-400">
-              <span className="relative flex h-2 w-2 mr-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              Online
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleScanNetwork}
-            disabled={scanning}
-            className={`
-              relative inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white 
-              transition-all duration-200 
-              ${scanning
-                ? 'bg-indigo-400 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5'
-              }
-            `}
-          >
-            {scanning ? (
-              <>
-                <RefreshIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                {scanStatus}
-              </>
-            ) : (
-              <>
-                <Search className="-ml-1 mr-2 h-4 w-4" />
-                Avvia Scansione
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {/* Total Devices */}
         <div onClick={() => setDetail('total')} role="button" tabIndex={0}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-indigo-400 hover:-translate-y-0.5 transition-all">
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-indigo-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Server className="w-24 h-24 text-indigo-600 dark:text-indigo-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -177,7 +126,7 @@ export default function Home() {
 
         {/* Active Devices */}
         <div onClick={() => setDetail('online')} role="button" tabIndex={0}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-green-400 hover:-translate-y-0.5 transition-all">
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-green-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Zap className="w-24 h-24 text-green-600 dark:text-green-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -198,7 +147,7 @@ export default function Home() {
 
         {/* Networks */}
         <div onClick={() => setDetail('networks')} role="button" tabIndex={0}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-blue-400 hover:-translate-y-0.5 transition-all">
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-blue-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Wifi className="w-24 h-24 text-blue-600 dark:text-blue-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -219,7 +168,7 @@ export default function Home() {
 
         {/* Security Alerts */}
         <div onClick={() => setDetail('alerts')} role="button" tabIndex={0}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-orange-400 hover:-translate-y-0.5 transition-all">
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 relative overflow-hidden group cursor-pointer hover:ring-2 hover:ring-orange-400 hover:-translate-y-0.5 transition-all">
           <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Shield className="w-24 h-24 text-orange-600 dark:text-orange-400 transform translate-x-4 -translate-y-4" />
           </div>
@@ -243,63 +192,79 @@ export default function Home() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        {/* Left Column - Charts */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Topology Map */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
-            <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+        {/* Left Column - Topology Map */}
+        <div className="lg:col-span-2">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm overflow-hidden border border-slate-200/70 dark:border-white/10 h-full flex flex-col">
+            <div className="p-5 border-b border-slate-200/70 dark:border-white/10 flex justify-between items-center">
               <h3 className="font-semibold text-gray-900 dark:text-white">Topologia Rete</h3>
               <Link href="/mappa" className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center">
                 Schermo Intero
                 <ArrowRight className="w-4 h-4 ml-1" />
               </Link>
             </div>
-            <div className="h-[400px]">
-              <TopologyMap devices={devices} />
+            <div className="flex-1 min-h-[540px]">
+              <TopologyMap devices={devices} className="h-full rounded-none border-0 shadow-none" />
             </div>
-          </div>
-
-          {/* Network Tables (Servizi e Porte) */}
-          <div className="space-y-6">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Dettaglio Reti e Servizi</h3>
-            {Object.entries(groupedDevices).map(([subnet, subDevices]) => (
-              <NetworkGroup
-                key={subnet}
-                subnet={subnet}
-                devices={subDevices}
-                onUpdateDevice={handleUpdateDevice}
-              />
-            ))}
           </div>
         </div>
 
-        {/* Right Column - Stats & Traffic */}
-        <div className="space-y-8">
+        {/* Right Column - Stato/Scan + Traffico */}
+        <div className="space-y-8 flex flex-col">
+          {/* Stato Sistema + Avvia Scansione */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stato Sistema</span>
+                <div className="flex items-center text-sm font-medium text-green-600 dark:text-green-400 mt-0.5">
+                  <span className="relative flex h-2 w-2 mr-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  Online
+                </div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-green-50 dark:bg-green-900/20">
+                <Activity className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleScanNetwork}
+              disabled={scanning}
+              className={`w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all duration-200 ${scanning
+                ? 'bg-indigo-400 cursor-not-allowed'
+                : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg'
+                }`}
+            >
+              {scanning ? (
+                <><RefreshIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />{scanStatus}</>
+              ) : (
+                <><Search className="-ml-1 mr-2 h-4 w-4" />Avvia Scansione</>
+              )}
+            </button>
+          </div>
+
           {/* Traffic Monitor */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-100 dark:border-gray-700 h-[400px] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 flex-1 min-h-[380px] flex flex-col">
             <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Traffico Rete</h3>
             <div className="flex-1">
               <TrafficChart />
             </div>
           </div>
-
-          {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl shadow-md p-6 text-white">
-            <h3 className="font-bold text-lg mb-2">Azioni Rapide</h3>
-            <p className="text-indigo-100 text-sm mb-6">Gestisci e configura la tua rete</p>
-
-            <div className="space-y-3">
-              <Link href="/dispositivi" className="block w-full bg-white/10 hover:bg-white/20 transition-colors rounded-lg p-3 text-sm font-medium flex items-center">
-                <Search className="w-4 h-4 mr-3" />
-                Cerca Dispositivi
-              </Link>
-              <Link href="/impostazioni" className="block w-full bg-white/10 hover:bg-white/20 transition-colors rounded-lg p-3 text-sm font-medium flex items-center">
-                <Zap className="w-4 h-4 mr-3" />
-                Configura Agent
-              </Link>
-            </div>
-          </div>
         </div>
+      </div>
+
+      {/* Dettaglio Reti e Servizi (larghezza piena) */}
+      <div className="space-y-6 mb-8">
+        <h3 className="font-semibold text-gray-900 dark:text-white">Dettaglio Reti e Servizi</h3>
+        {Object.entries(groupedDevices).map(([subnet, subDevices]) => (
+          <NetworkGroup
+            key={subnet}
+            subnet={subnet}
+            devices={subDevices}
+            onUpdateDevice={handleUpdateDevice}
+          />
+        ))}
       </div>
 
       {detail && <KpiDetailModal kind={detail} devices={devices} onClose={() => setDetail(null)} />}
