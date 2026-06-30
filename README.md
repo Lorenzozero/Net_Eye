@@ -182,6 +182,8 @@ Un solo codice, due modalità:
 
 Il server **aggrega più agenti**, sulla stessa rete o su reti diverse: ogni agente ha un `agent_id` persistente, e nei dispositivi viene tracciata la **rete di provenienza** (dedup per MAC per rete). La pagina **Impostazioni** mostra tutti gli agenti con rete, n° dispositivi e stato online/offline (heartbeat 90s).
 
+**Installer agenti pronti all'uso** (pulsanti in Impostazioni → "Scarica Installer"): il server genera e serve uno **script Windows `.bat`**, **Linux `.sh`** e un **agente Python autonomo** ([`agent/networkscope_agent.py`](agent/networkscope_agent.py), solo libreria standard). Lo script scarica l'agente Python e lo avvia puntando automaticamente al server giusto; l'agente scansiona la rete locale (ping + ARP + reverse DNS + porte) e riporta — il server arricchisce poi il **vendor** dai MAC tramite il DB OUI.
+
 ### ⚡ Performance, politeness e persistenza
 | Tecnica | Come funziona | Beneficio |
 |---|---|---|

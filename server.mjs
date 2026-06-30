@@ -840,6 +840,53 @@ function aggregatedDevices() {
   return all;
 }
 
+// Arricchisce un device riportato da un agente remoto: vendor dall'OUI + risk score (lato server).
+function enrichRemoteDevice(d) {
+  if (d.mac_address && (!d.vendor || d.vendor === 'Unknown')) {
+    d.vendor = isRandomMac(d.mac_address) ? 'MAC privato (randomizzato)' : (ouiVendor(d.mac_address) || 'Unknown');
+  }
+  if (!d.risk) d.risk = computeRisk(d);
+  return d;
+}
+
+// Serve gli installer dell'agente (script + agente Python), con l'URL del server iniettato.
+function serveInstaller(req, res, name) {
+  const base = 'http://' + (req.headers.host || `${local.ip}:${PORT}`);
+  const send = (content, type) => {
+    res.writeHead(200, { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${name}"`, 'Access-Control-Allow-Origin': '*' });
+    res.end(content);
+  };
+  if (name === 'networkscope_agent.py') {
+    try { return send(readFileSync(new URL('./agent/networkscope_agent.py', import.meta.url)), 'text/x-python; charset=utf-8'); }
+    catch { res.writeHead(404); return res.end('agent non trovato'); }
+  }
+  if (name === 'install_windows.bat') {
+    const bat = [
+      '@echo off', 'setlocal', `set "SERVER=${base}"`,
+      'echo === NetworkScope Agent ===',
+      'where python >nul 2>nul || (echo [!] Python non trovato. Installalo da https://python.org e riprova. ^& pause ^& exit /b 1)',
+      'echo Scarico l\'agent da %SERVER% ...',
+      'curl -L -o "%TEMP%\\networkscope_agent.py" "%SERVER%/static/networkscope_agent.py" || (echo [!] Download fallito ^& pause ^& exit /b 1)',
+      'echo Avvio agent (Ctrl+C per fermare)...',
+      'python "%TEMP%\\networkscope_agent.py" "%SERVER%"', 'pause',
+    ].join('\r\n');
+    return send(bat, 'application/octet-stream');
+  }
+  if (name === 'install_linux.sh') {
+    const sh = [
+      '#!/bin/bash', `SERVER="${base}"`,
+      'echo "=== NetworkScope Agent ==="',
+      'command -v python3 >/dev/null 2>&1 || { echo "[!] Installa python3"; exit 1; }',
+      'echo "Scarico l\'agent da $SERVER ..."',
+      'curl -fsSL -o /tmp/networkscope_agent.py "$SERVER/static/networkscope_agent.py" || { echo "[!] Download fallito"; exit 1; }',
+      'echo "Avvio agent (Ctrl+C per fermare)..."',
+      'python3 /tmp/networkscope_agent.py "$SERVER"',
+    ].join('\n');
+    return send(sh, 'application/x-sh');
+  }
+  res.writeHead(404); res.end('not found');
+}
+
 const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
@@ -848,6 +895,9 @@ const server = createServer(async (req, res) => {
 
   const { pathname } = new URL(req.url, `http://localhost:${PORT}`);
   const parts = pathname.split('/').filter(Boolean);
+
+  // Download installer/agent (i pulsanti "Scarica Installer")
+  if (req.method === 'GET' && parts[0] === 'static' && parts[1]) return serveInstaller(req, res, parts[1]);
 
   if (req.method === 'GET' && pathname === '/api/v1/devices') return json(res, 200, aggregatedDevices());
 
@@ -937,7 +987,7 @@ const server = createServer(async (req, res) => {
         const ex = remoteAgents.get(id);
         remoteAgents.set(id, {
           info: body.info || ex?.info || { agent_id: id },
-          devices: body.devices || [], traffic: body.traffic || null, connections: body.connections || [],
+          devices: (body.devices || []).map(enrichRemoteDevice), traffic: body.traffic || null, connections: body.connections || [],
           lastReport: Date.now(), registered_at: ex?.registered_at || Date.now(),
         });
         removedAgents.delete(id);

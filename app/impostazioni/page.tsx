@@ -5,7 +5,7 @@ import Layout from '@/components/Layout';
 import { fetchAgents, deleteAgent } from '@/lib/api';
 import { Agent } from '@/types';
 import {
-    Save, Bell, Cpu, Terminal, Download,
+    Bell, Cpu, Terminal, Download,
     Monitor, Server, RefreshCw, Trash2, CheckCircle, XCircle, Clock
 } from 'lucide-react';
 
@@ -13,6 +13,18 @@ export default function ImpostazioniPage() {
     const [agents, setAgents] = useState<Agent[]>([]);
     const [serverUrl, setServerUrl] = useState('http://localhost:8000');
     const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
+    const [notifications, setNotifications] = useState(true);
+
+    // Le impostazioni si salvano automaticamente (localStorage), senza pulsante "Salva".
+    const toggleNotifications = () => {
+        setNotifications((prev) => {
+            const next = !prev;
+            try { localStorage.setItem('ns:notifications', String(next)); } catch { }
+            setToast({ msg: next ? 'Notifiche attivate' : 'Notifiche disattivate', type: 'success' });
+            setTimeout(() => setToast(null), 2000);
+            return next;
+        });
+    };
 
     const loadAgents = async () => {
         try {
@@ -39,6 +51,8 @@ export default function ImpostazioniPage() {
         if (typeof window !== 'undefined') {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- hostname disponibile solo lato client
             setServerUrl(`http://${window.location.hostname}:8000`);
+            const savedNotif = localStorage.getItem('ns:notifications');
+            if (savedNotif !== null) setNotifications(savedNotif === 'true');
         }
         loadAgents();
         const interval = setInterval(loadAgents, 15000);
@@ -283,28 +297,15 @@ export default function ImpostazioniPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Abilita Notifiche</label>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Ricevi avvisi per nuovi dispositivi</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Ricevi avvisi per nuovi dispositivi · <span className="text-green-600 dark:text-green-400">salvataggio automatico</span></p>
                         </div>
-                        <button className="bg-indigo-600 relative inline-flex h-7 w-12 items-center rounded-full transition-colors">
-                            <span className="translate-x-6 inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform" />
+                        <button
+                            onClick={toggleNotifications}
+                            className={`${notifications ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'} relative inline-flex h-7 w-12 items-center rounded-full transition-colors`}
+                        >
+                            <span className={`${notifications ? 'translate-x-6' : 'translate-x-1'} inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform`} />
                         </button>
                     </div>
-                </div>
-
-                {/* ... existing content ... */}
-
-                {/* Salva */}
-                <div className="flex justify-end">
-                    <button
-                        onClick={() => {
-                            setToast({ msg: 'Impostazioni salvate con successo!', type: 'success' });
-                            setTimeout(() => setToast(null), 3000);
-                        }}
-                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200"
-                    >
-                        <Save className="w-5 h-5 mr-2" />
-                        Salva Impostazioni
-                    </button>
                 </div>
             </div>
 
