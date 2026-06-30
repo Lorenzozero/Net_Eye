@@ -14,6 +14,8 @@ export interface Device {
     banners?: Record<string, string> | null;
     upnp?: { friendlyName?: string | null; model?: string | null; manufacturer?: string | null; server?: string | null } | null;
     risk?: { score: number; level: string; reasons: string[] } | null;
+    first_seen?: string;
+    seen_count?: number;
 }
 
 export interface ScanResult {

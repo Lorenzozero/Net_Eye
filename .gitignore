@@ -42,6 +42,10 @@ yarn-error.log*
 # database OUI IEEE generato (rigenerabile con: npm run oui)
 oui-db.json
 
+# stato persistente dello scanner e log del backend (runtime)
+state.json
+backend.log
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -288,6 +288,18 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                                         {selectedDevice.is_active ? 'Online' : 'Offline'}
                                                     </span>
                                                 </div>
+                                                {selectedDevice.first_seen && (
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase">Primo rilevamento</label>
+                                                        <span className="text-sm text-gray-900 dark:text-white">{new Date(selectedDevice.first_seen).toLocaleString('it-IT')}</span>
+                                                    </div>
+                                                )}
+                                                {typeof selectedDevice.seen_count === 'number' && (
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase">Rilevamenti</label>
+                                                        <span className="text-sm text-gray-900 dark:text-white">{selectedDevice.seen_count}× · ultimo {new Date(selectedDevice.last_seen).toLocaleTimeString('it-IT')}</span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {selectedDevice.risk && selectedDevice.risk.reasons.length > 0 && (

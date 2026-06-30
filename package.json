@@ -9,7 +9,9 @@
     "lint": "eslint",
     "backend": "node server.mjs",
     "mock": "node mock-api.mjs",
-    "oui": "node scripts/fetch-oui.mjs"
+    "oui": "node scripts/fetch-oui.mjs",
+    "autostart:install": "node scripts/install-autostart.mjs",
+    "autostart:uninstall": "node scripts/uninstall-autostart.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.556.0",

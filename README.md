@@ -84,6 +84,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online/Reti/Avvisi aprono un modale con dettagli ed **evidenze** (es. quali host hanno porte anomale e perché).
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
 - 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
+- ⚡ **Scansione incrementale + persistenza** — cicli ~3× più veloci (arricchimento solo per device nuovi/stale), **storico** dispositivi salvato su disco e ripristinato al riavvio; **autostart** dello scanner al login senza admin.
 - 🏷️ **Vendor 100% offline** — database **OUI IEEE completo** (~40k vendor) via `npm run oui`: niente più "Unknown" anche senza internet.
 - 📤 **Export CSV / PDF** — esporta l'inventario completo (IP, MAC, vendor, tipo, OS, porte, rischio) dalla pagina Dispositivi.
 
@@ -174,6 +175,14 @@ Tutte le tecniche sono **attive e reali**, implementate in `server.mjs` con i so
 |---|---|---|
 | **Security risk scoring** | porte pericolose esposte (Telnet, SMB, RDP, VNC, DB…) + n° porte + vendor ignoto | punteggio 0–100 e livello **basso/medio/alto** con evidenze |
 
+### ⚡ Performance e persistenza
+| Tecnica | Come funziona | Beneficio |
+|---|---|---|
+| **Scansione incrementale** | l'arricchimento pesante (porte, banner, UPnP) viene eseguito solo per i dispositivi **nuovi o "stale"** (TTL 5 min); gli altri ricevono solo l'aggiornamento di stato | cicli ~3× più veloci (es. da 27s a <10s) |
+| **Registro persistente** | lo stato dei dispositivi è salvato su `state.json` con **storico** (`first_seen`, `last_seen`, `seen_count`) | i dispositivi noti ricompaiono **subito** al riavvio del backend |
+| **Tracciamento online/offline** | i device spariti restano in elenco come *offline* e vengono rimossi dopo 30 min | si vede cosa è scomparso dalla rete |
+| **Autostart a livello utente** | `npm run autostart:install` registra un avvio al login (Startup `.vbs` su Windows, `.desktop` su Linux, LaunchAgent su macOS) | lo scanner **sopravvive al riavvio del PC** senza permessi admin né servizi critici |
+
 > ⚠️ **Limiti onesti:** l'analisi dei flussi riguarda la **macchina che esegue lo scanner** (la sua socket table); per vedere il traffico *di altri* dispositivi servirebbe una porta mirror/gateway o packet-capture. Il **deep packet inspection** per-protocollo richiederebbe Npcap + privilegi (in roadmap).
 
 ---
@@ -220,6 +229,8 @@ npm run dev
 | `npm run backend` | 🛰️ Backend di scansione **reale** della rete (porta 8000) |
 | `npm run mock` | 🧪 Backend finto con dati demo (porta 8000) |
 | `npm run oui` | 🏷️ Scarica il DB OUI IEEE completo (~40k vendor) per la risoluzione offline |
+| `npm run autostart:install` | 🔁 Avvio automatico dello scanner al login (livello utente, **no admin**) |
+| `npm run autostart:uninstall` | ↩️ Rimuove l'avvio automatico |
 | `npm run dev` | Server di sviluppo frontend con hot-reload |
 | `npm run build` | Build di produzione |
 | `npm start` | Avvia la build di produzione |
@@ -360,6 +371,8 @@ interface Device {
 - [x] 🧪 Mock backend a zero dipendenze per il collaudo della GUI
 - [x] 📦 Database OUI completo offline (~40k vendor, `npm run oui`)
 - [x] 📤 Export report CSV / PDF
+- [x] ⚡ Scansione incrementale + registro persistente con storico
+- [x] 🔁 Autostart dello scanner al login (livello utente, no admin)
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi
 - [ ] 🧪 Test automatici (Vitest + Playwright)

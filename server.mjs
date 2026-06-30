@@ -108,6 +108,30 @@ let scanning = false;
 const traffic = [];        // serie temporale: { time, download(KB/s), upload(KB/s), rxPps, txPps }
 let lastCounters = null;   // ultimo snapshot dei contatori interfaccia
 const removedAgents = new Set(); // agenti eliminati dall'utente (non vengono ri-mostrati)
+
+// Registro persistente dei dispositivi (storico) — sopravvive al riavvio del backend.
+const registry = new Map();                         // key (mac|ip) → device con storico
+const STATE_FILE = new URL('./state.json', import.meta.url);
+const ENRICH_TTL = 5 * 60 * 1000;                   // ri-arricchimento (banner/UPnP/porte) ogni 5 min
+const PRUNE_TTL = 30 * 60 * 1000;                   // rimuovi i device offline da oltre 30 min
+const deviceKey = (mac, ip) => (mac ? `mac:${mac}` : `ip:${ip}`);
+
+function loadState() {
+  try {
+    const s = JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+    for (const d of (s.devices || [])) { d.is_active = false; registry.set(deviceKey(d.mac_address, d.ip_address), d); }
+    for (const a of (s.removedAgents || [])) removedAgents.add(a);
+    publishDevices();
+    console.log(`   stato caricato: ${registry.size} dispositivi noti, ${removedAgents.size} agenti rimossi`);
+  } catch { /* nessuno stato precedente */ }
+}
+function saveState() {
+  try { writeFileSync(STATE_FILE, JSON.stringify({ devices: [...registry.values()], removedAgents: [...removedAgents] })); } catch {}
+}
+function publishDevices() {
+  devices = [...registry.values()].sort((a, b) => ipKey(a.ip_address).localeCompare(ipKey(b.ip_address)));
+  devices.forEach((d, i) => (d.id = i + 1));
+}
 const vendorCache = loadCache();
 const vendorQueue = [];
 let queueRunning = false;
@@ -241,9 +265,11 @@ async function runVendorQueue() {
     vendorCache.set(mac, v);
     saveCache();
     // Aggiorna i device che usano questo MAC e riclassifica
+    let updated = false;
     for (const d of devices) {
-      if (d.mac_address === mac) { d.vendor = v; Object.assign(d, identify(d)); d.risk = computeRisk(d); }
+      if (d.mac_address === mac) { d.vendor = v; Object.assign(d, identify(d)); d.risk = computeRisk(d); updated = true; }
     }
+    if (updated) saveState();
     await new Promise((r) => setTimeout(r, 1300));
   }
   queueRunning = false;
@@ -488,17 +514,39 @@ function classifyDevice(d) {
 
 const ipKey = (ip) => ip.split('.').map((n) => n.padStart(3, '0')).join('');
 
+// Arricchimento "pesante" di un dispositivo (hostname, porte, banner, UPnP, vendor, tipo, rischio).
+// Eseguito solo per device nuovi o "stale" → cicli successivi molto più leggeri.
+async function enrichDevice(dev, upnp) {
+  const ip = dev.ip_address;
+  let host = await reverseDnsT(ip);
+  if (!host) host = await netbios(ip);
+  if (!host && upnp?.friendlyName) host = upnp.friendlyName;
+  if (!host && ip === local.ip) host = os.hostname();
+  if (host) dev.hostname = host;
+
+  const fp = await scanPortsList(ip, FINGERPRINT_PORTS);
+  dev.open_ports = dev.open_ports?.length ? [...new Set([...dev.open_ports, ...fp])].sort((a, b) => a - b) : fp;
+  dev.banners = { ...(dev.banners || {}), ...(await grabBanners(ip, dev.open_ports, [22, 80, 443])) };
+  if (upnp) dev.upnp = upnp;
+
+  const vendor = quickVendor(dev.mac_address);
+  if (vendor) dev.vendor = vendor; else { enqueueVendor(dev.mac_address); if (!dev.vendor) dev.vendor = 'Unknown'; }
+
+  Object.assign(dev, identify(dev));
+  dev.risk = computeRisk(dev);
+  dev.enriched_at = Date.now();
+}
+
 async function scanNetwork() {
   if (scanning) return;
   scanning = true;
   const t0 = Date.now();
   try {
-    console.log(`🔍 Scansione di ${local.base}.0/24 ...`);
     const ips = Array.from({ length: 254 }, (_, i) => `${local.base}.${i + 1}`);
     const live = new Set();
     const pingInfo = {};
     const ssdpPromise = ssdpDiscover(3000);   // discovery UPnP in parallelo al ping-sweep
-    const BATCH = 32;
+    const BATCH = 48;                          // concorrenza ping più alta
     for (let i = 0; i < ips.length; i += BATCH) {
       const res = await Promise.all(ips.slice(i, i + BATCH).map(async (ip) => {
         const r = await ping(ip);
@@ -511,7 +559,6 @@ async function scanNetwork() {
     const arp = await arpTable();
     Object.keys(arp).forEach((ip) => { if (ip.startsWith(local.base + '.')) live.add(ip); });
 
-    // Risolvi le descrizioni UPnP dei dispositivi che hanno risposto a SSDP
     const ssdp = await ssdpPromise;
     const upnpByIp = {};
     await Promise.all(Object.entries(ssdp).map(async ([ip, info]) => {
@@ -519,46 +566,49 @@ async function scanNetwork() {
       upnpByIp[ip] = { server: info.server, ...(desc || {}) };
     }));
 
-    const sorted = [...live].sort((a, b) => ipKey(a).localeCompare(ipKey(b)));
-    let id = 1;
-    const list = await mapLimit(sorted, 8, async (ip) => {
+    const nowISO = new Date().toISOString();
+    const now = Date.now();
+    const liveKeys = new Set();
+    const toEnrich = [];
+    let newCount = 0;
+
+    for (const ip of live) {
       const mac = arp[ip] || (ip === local.ip ? local.mac : null);
-      const prev = devices.find((d) => d.ip_address === ip);
+      const key = deviceKey(mac, ip);
+      liveKeys.add(key);
+      let dev = registry.get(key);
+      const isNew = !dev;
+      if (isNew) {
+        dev = { first_seen: nowISO, seen_count: 0, enriched_at: 0, open_ports: [], banners: {}, upnp: null, vendor: 'Unknown', device_type: 'desktop', os: null };
+        registry.set(key, dev);
+        newCount++;
+      }
+      dev.ip_address = ip;
+      dev.mac_address = mac;
+      dev.is_active = true;
+      dev.last_seen = nowISO;
+      dev.seen_count = (dev.seen_count || 0) + 1;
       const pInfo = pingInfo[ip] || {};
-      // hostname: reverse DNS (con timeout) → NetBIOS (Windows) → nome UPnP → host locale
-      let host = await reverseDnsT(ip);
-      if (!host) host = await netbios(ip);
-      if (!host && upnpByIp[ip]?.friendlyName) host = upnpByIp[ip].friendlyName;
-      if (!host && ip === local.ip) host = os.hostname();
-      // fingerprint porte (riusa quelle già trovate da uno scan profondo precedente)
-      const fp = await scanPortsList(ip, FINGERPRINT_PORTS);
-      const ports = prev?.open_ports?.length ? [...new Set([...prev.open_ports, ...fp])].sort((a, b) => a - b) : fp;
-      // banner grabbing leggero in discovery (porte chiave); il set completo è nello scan profondo
-      const banners = await grabBanners(ip, ports, [22, 80, 443]);
-      const vendor = quickVendor(mac);
-      if (!vendor) enqueueVendor(mac);
-      const dev = {
-        ip_address: ip,
-        mac_address: mac,
-        hostname: host,
-        vendor: vendor || 'Unknown',
-        is_active: true,
-        last_seen: new Date().toISOString(),
-        open_ports: ports,
-        ttl: pInfo.ttl ?? null,
-        latency: pInfo.rtt ?? null,
-        banners,
-        upnp: upnpByIp[ip] || null,
-      };
-      Object.assign(dev, identify(dev));
-      dev.risk = computeRisk(dev);
-      return dev;
-    });
-    list.forEach((d) => (d.id = id++));
-    devices = list;
-    const byType = list.reduce((a, d) => ((a[d.device_type] = (a[d.device_type] || 0) + 1), a), {});
-    console.log(`✅ ${devices.length} dispositivi in ${((Date.now() - t0) / 1000).toFixed(1)}s →`,
-      Object.entries(byType).map(([k, n]) => `${k}:${n}`).join(' '));
+      dev.ttl = pInfo.ttl ?? dev.ttl ?? null;
+      dev.latency = pInfo.rtt ?? null;
+      if (isNew || now - (dev.enriched_at || 0) > ENRICH_TTL) toEnrich.push([dev, upnpByIp[ip]]);
+    }
+
+    // Arricchimento SOLO per device nuovi o stale → enorme risparmio sui cicli successivi
+    await mapLimit(toEnrich, 8, async ([dev, upnp]) => { await enrichDevice(dev, upnp); });
+
+    // Offline + pruning dei device spariti da troppo tempo
+    for (const [key, dev] of registry) {
+      if (!liveKeys.has(key)) {
+        dev.is_active = false;
+        if (now - new Date(dev.last_seen).getTime() > PRUNE_TTL) registry.delete(key);
+      }
+    }
+
+    publishDevices();
+    saveState();
+    const active = devices.filter((d) => d.is_active).length;
+    console.log(`✅ ${active}/${devices.length} attivi · ${newCount} nuovi · ${toEnrich.length} arricchiti in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (e) {
     console.error('Errore scansione:', e.message);
   } finally {
@@ -717,6 +767,8 @@ const server = createServer(async (req, res) => {
         d.banners = { ...(d.banners || {}), ...(await grabBanners(ip, ports)) };
         Object.assign(d, identify(d));
         d.risk = computeRisk(d);
+        d.enriched_at = Date.now();
+        saveState();
       }
       console.log(`🔓 ${ip}: porte → ${ports.join(', ') || 'nessuna'}`);
     });
@@ -735,6 +787,7 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'DELETE' && parts[2] === 'agents' && parts[3]) {
     removedAgents.add(parts[3]);
+    saveState();
     return json(res, 200, { message: 'agente rimosso' });
   }
 
@@ -744,6 +797,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`🛰️  NetworkScope backend v2 su http://localhost:${PORT}`);
   console.log(`   Subnet: ${local.base}.0/24 · host: ${local.ip} · OUI: ${Object.keys(OUI).length}${OUI_DB ? ` + DB IEEE ${Object.keys(OUI_DB).length}` : ' (esegui npm run oui per il DB completo)'} · cache: ${vendorCache.size}`);
+  loadState();                           // ripristina lo storico dispositivi dal disco
   scanNetwork();
   setInterval(scanNetwork, 60_000);
   sampleTraffic();                       // primo campione traffico
