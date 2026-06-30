@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Device } from '@/types';
+import DeviceDetailModal from '@/components/DeviceDetailModal';
 import { Pencil, X, Check, Edit2 } from 'lucide-react';
 import { Activity } from 'lucide-react';
 
@@ -16,6 +17,7 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
     const [isEditingName, setIsEditingName] = useState(false);
     const [editingDevice, setEditingDevice] = useState<string | null>(null);
     const [tempHostname, setTempHostname] = useState('');
+    const [selected, setSelected] = useState<Device | null>(null);
 
     // Gateway della subnet (per mostrarne hostname/vendor nell'header)
     const gw = devices.find((d) => d.device_type === 'gateway' || d.device_type === 'router' || d.ip_address.endsWith('.1'));
@@ -83,28 +85,28 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {devices.map((device) => (
-                            <tr key={device.ip_address} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <tr key={device.ip_address} onClick={() => setSelected(device)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
                                     {device.ip_address}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     {editingDevice === device.ip_address ? (
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                                             <input
                                                 type="text"
                                                 value={tempHostname}
                                                 onChange={(e) => setTempHostname(e.target.value)}
                                                 className="border border-indigo-300 rounded px-2 py-1 text-sm w-40 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                             />
-                                            <button onClick={() => saveDevice(device.ip_address)} className="text-green-600"><Check className="w-4 h-4" /></button>
-                                            <button onClick={() => setEditingDevice(null)} className="text-red-500"><X className="w-4 h-4" /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); saveDevice(device.ip_address); }} className="text-green-600"><Check className="w-4 h-4" /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); setEditingDevice(null); }} className="text-red-500"><X className="w-4 h-4" /></button>
                                         </div>
                                     ) : (
                                         <div className="flex items-center">
                                             <span className="text-sm font-medium text-gray-900 dark:text-white mr-2">
                                                 {device.hostname || 'N/D'}
                                             </span>
-                                            <button onClick={() => startEditing(device)} className="text-gray-300 hover:text-indigo-600">
+                                            <button onClick={(e) => { e.stopPropagation(); startEditing(device); }} className="text-gray-300 hover:text-indigo-600">
                                                 <Pencil className="w-3 h-3" />
                                             </button>
                                         </div>
@@ -141,6 +143,8 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
                     </tbody>
                 </table>
             </div>
+
+            {selected && <DeviceDetailModal device={selected} onClose={() => setSelected(null)} />}
         </div>
     );
 }

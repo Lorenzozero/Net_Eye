@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import Layout from '@/components/Layout';
 import { useTheme } from '@/contexts/ThemeContext';
 import { fetchTraffic, fetchConnections, TrafficData, TrafficPoint, Connection } from '@/lib/api';
+import ConnectionModal from '@/components/ConnectionModal';
 import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe } from 'lucide-react';
 
 const TrafficAreaChart = dynamic(() => import('@/components/TrafficAreaChart'), {
@@ -45,6 +46,7 @@ export default function TrafficoPage() {
     const [data, setData] = useState<TrafficData | null>(null);
     const [connections, setConnections] = useState<Connection[]>([]);
     const [offline, setOffline] = useState(false);
+    const [selConn, setSelConn] = useState<Connection | null>(null);
 
     useEffect(() => {
         let active = true;
@@ -149,7 +151,7 @@ export default function TrafficoPage() {
                                 {connections.length === 0 ? (
                                     <tr><td colSpan={3} className="px-2 py-8 text-center text-gray-400">Nessuna connessione attiva</td></tr>
                                 ) : connections.map((c, i) => (
-                                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <tr key={i} onClick={() => setSelConn(c)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
                                         <td className="px-2 py-2">
                                             <div className="font-medium text-gray-900 dark:text-white truncate max-w-[180px]" title={c.remoteHost || c.remoteIp}>
                                                 {c.remoteHost || c.remoteIp}
@@ -170,6 +172,8 @@ export default function TrafficoPage() {
                     </div>
                 </div>
             </div>
+
+            {selConn && <ConnectionModal conn={selConn} onClose={() => setSelConn(null)} />}
         </Layout>
     );
 }

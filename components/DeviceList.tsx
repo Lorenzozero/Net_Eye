@@ -1,7 +1,8 @@
-'use client';
+﻿'use client';
 
 import { Device } from '@/types';
 import { triggerPortScan } from '@/lib/api';
+import DeviceDetailModal from '@/components/DeviceDetailModal';
 import { useState } from 'react';
 import {
     Search, Server, Wifi, Smartphone, Monitor, Router, Printer,
@@ -151,7 +152,7 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                         <div className="flex flex-col gap-1">
                                             <span className="inline-flex items-center gap-1 text-xs font-medium capitalize px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 w-fit">
                                                 {device.device_type?.replace('_', ' ') || 'sconosciuto'}
-                                                {device.os ? ` · ${device.os}` : ''}
+                                                {device.os ? ` Â· ${device.os}` : ''}
                                             </span>
                                             <span className="text-sm text-gray-900 dark:text-white">{device.vendor || 'Vendor Sconosciuto'}</span>
                                             <div className="flex items-center gap-2">
@@ -223,157 +224,7 @@ export default function DeviceList({ devices }: DeviceListProps) {
                 </p>
             </div>
 
-            {/* Device Detail Modal */}
-            {selectedDevice && (
-                <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        {/* Backdrop */}
-                        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedDevice(null)}></div>
-
-                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                        <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-200 dark:border-gray-700">
-                            <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <div className="sm:flex sm:items-start">
-                                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 sm:mx-0 sm:h-10 sm:w-10">
-                                        <Server className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                                    </div>
-                                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
-                                            Dettagli Dispositivo
-                                        </h3>
-                                        <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                            Visualizza le informazioni complete rilevate per questo dispositivo.
-                                        </div>
-
-                                        <div className="mt-4 border-t border-gray-100 dark:border-gray-700 pt-4 space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Hostname</label>
-                                                    <span className="text-sm text-gray-900 dark:text-white">{selectedDevice.hostname || 'N/A'}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">IP Address</label>
-                                                    <span className="text-sm font-mono text-gray-900 dark:text-white">{selectedDevice.ip_address}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">MAC Address</label>
-                                                    <span className="text-sm font-mono text-gray-900 dark:text-white">{selectedDevice.mac_address || 'N/A'}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Vendor</label>
-                                                    <span className="text-sm text-gray-900 dark:text-white">{selectedDevice.vendor || 'N/A'}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Tipo</label>
-                                                    <span className="text-sm capitalize text-indigo-600 dark:text-indigo-400">{selectedDevice.device_type?.replace('_', ' ')}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Sistema (OS)</label>
-                                                    <span className="text-sm text-gray-900 dark:text-white">{selectedDevice.os || 'N/A'}{selectedDevice.ttl ? ` · TTL ${selectedDevice.ttl}` : ''}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Latenza</label>
-                                                    <span className="text-sm text-gray-900 dark:text-white">{typeof selectedDevice.latency === 'number' ? `${selectedDevice.latency} ms` : 'N/A'}</span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Rischio</label>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${riskCls(selectedDevice.risk?.level || 'ok')}`}>
-                                                        {selectedDevice.risk ? `${selectedDevice.risk.level} (${selectedDevice.risk.score})` : 'ok'}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase">Stato</label>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${selectedDevice.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                        {selectedDevice.is_active ? 'Online' : 'Offline'}
-                                                    </span>
-                                                </div>
-                                                {selectedDevice.first_seen && (
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-gray-500 uppercase">Primo rilevamento</label>
-                                                        <span className="text-sm text-gray-900 dark:text-white">{new Date(selectedDevice.first_seen).toLocaleString('it-IT')}</span>
-                                                    </div>
-                                                )}
-                                                {typeof selectedDevice.seen_count === 'number' && (
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-gray-500 uppercase">Rilevamenti</label>
-                                                        <span className="text-sm text-gray-900 dark:text-white">{selectedDevice.seen_count}× · ultimo {new Date(selectedDevice.last_seen).toLocaleTimeString('it-IT')}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {selectedDevice.risk && selectedDevice.risk.reasons.length > 0 && (
-                                                <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10 p-3">
-                                                    <label className="block text-xs font-bold text-orange-700 dark:text-orange-300 uppercase mb-1">⚠️ Evidenze di rischio</label>
-                                                    <ul className="list-disc list-inside text-xs text-orange-700 dark:text-orange-300">
-                                                        {selectedDevice.risk.reasons.map((r, i) => <li key={i}>{r}</li>)}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                            {selectedDevice.banners && Object.keys(selectedDevice.banners).length > 0 && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Servizi rilevati (banner)</label>
-                                                    <div className="space-y-1">
-                                                        {Object.entries(selectedDevice.banners).map(([port, b]) => (
-                                                            <div key={port} className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/40 rounded px-2 py-1">
-                                                                <span className="text-indigo-500">:{port}</span> {b}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {selectedDevice.upnp && (selectedDevice.upnp.friendlyName || selectedDevice.upnp.model || selectedDevice.upnp.manufacturer) && (
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">UPnP / SSDP</label>
-                                                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                                                        {[selectedDevice.upnp.friendlyName, selectedDevice.upnp.model, selectedDevice.upnp.manufacturer].filter(Boolean).join(' · ')}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Porte Aperte (Scansione)</label>
-                                                {selectedDevice.open_ports && selectedDevice.open_ports.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {selectedDevice.open_ports.map(port => (
-                                                            <span key={port} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
-                                                                <Terminal className="w-3 h-3 mr-1" />
-                                                                Porta {port}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-sm text-gray-400 italic">Nessuna porta aperta rilevata o scansione non completata.</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 dark:bg-gray-700/30 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                <button
-                                    type="button"
-                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
-                                    onClick={() => setSelectedDevice(null)}
-                                >
-                                    Chiudi
-                                </button>
-                                <button
-                                    type="button"
-                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                                    onClick={() => {
-                                        handleScan(selectedDevice.ip_address);
-                                    }}
-                                >
-                                    {scanning === selectedDevice.ip_address ? 'Scansione in corso...' : 'Avvia Scansione Completa'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {selectedDevice && <DeviceDetailModal device={selectedDevice} onClose={() => setSelectedDevice(null)} />}
         </div>
     );
 }

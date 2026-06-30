@@ -7,6 +7,7 @@ import {
     Wifi, HardDrive, Camera, SunMedium, Zap, Tv, Box
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import DeviceDetailModal from '@/components/DeviceDetailModal';
 
 // Tipi per la gestione della mappa
 interface Point { x: number; y: number }
@@ -14,6 +15,7 @@ interface Point { x: number; y: number }
 export default function TopologyMap({ devices, className }: { devices: Device[]; className?: string }) {
     // Stati per la gestione interfaccia
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+    const [detailDevice, setDetailDevice] = useState<Device | null>(null);
     const [scale, setScale] = useState(1);
     const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
     const [nodePositions, setNodePositions] = useState<Record<string, Point>>({});
@@ -348,10 +350,18 @@ export default function TopologyMap({ devices, className }: { devices: Device[];
                                     </div>
                                 </div>
                             )}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setDetailDevice(selectedDevice); }}
+                                className="w-full mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline text-left"
+                            >
+                                Dettagli completi →
+                            </button>
                         </div>
                     </div>
                 )}
             </div>
+
+            {detailDevice && <DeviceDetailModal device={detailDevice} onClose={() => setDetailDevice(null)} />}
         </div>
     );
 }
