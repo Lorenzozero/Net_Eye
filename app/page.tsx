@@ -78,6 +78,9 @@ export default function Home() {
   const riskyDevices = devices.filter(d => d.risk && d.risk.level !== 'ok').length;
   const highRisk = devices.filter(d => d.risk && d.risk.level === 'alto').length;
 
+  // Nuovi dispositivi: rilevati per la prima volta nell'ultima scansione (seen_count === 1)
+  const newDevices = devices.filter(d => d.seen_count === 1).length;
+
   // Raggruppa dispositivi per Subnet (es. 192.168.1.0/24)
   const groupedDevices = devices.reduce((acc, device) => {
     const parts = device.ip_address.split('.');
@@ -116,11 +119,11 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-600 dark:text-green-400 font-medium flex items-center">
+            <span className={`font-medium flex items-center ${newDevices > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`}>
               <Activity className="w-3 h-3 mr-1" />
-              {devices.length > 0 ? '+100%' : '0%'}
+              {newDevices}
             </span>
-            <span className="text-gray-400 ml-2">vs ultimo scan</span>
+            <span className="text-gray-400 ml-2">{newDevices === 1 ? 'nuovo dispositivo' : 'nuovi dispositivi'}</span>
           </div>
         </div>
 

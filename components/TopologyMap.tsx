@@ -268,14 +268,30 @@ export default function TopologyMap({ devices, className }: { devices: Device[];
                                         />
                                     </foreignObject>
 
-                                    {/* Label */}
-                                    <text
-                                        y={isGateway ? 45 : 35}
-                                        textAnchor="middle"
-                                        className={`text-[10px] font-medium select-none pointer-events-none ${isSelected ? 'fill-indigo-600 dark:fill-indigo-400 font-bold' : 'fill-slate-500 dark:fill-slate-400'}`}
-                                    >
-                                        {device.hostname?.split('.')[0] || device.ip_address}
-                                    </text>
+                                    {/* Label: nome/vendor/tipo + IP */}
+                                    {(() => {
+                                        const vendorOk = device.vendor && device.vendor !== 'Unknown' && device.vendor !== 'MAC privato (randomizzato)';
+                                        let primary = device.hostname?.split('.')[0] || (vendorOk ? device.vendor : '') || device.device_type?.replace('_', ' ') || device.ip_address;
+                                        if (primary.length > 18) primary = primary.slice(0, 16) + '…';
+                                        return (
+                                            <>
+                                                <text
+                                                    y={isGateway ? 44 : 34}
+                                                    textAnchor="middle"
+                                                    className={`text-[10px] font-semibold select-none pointer-events-none ${isSelected ? 'fill-indigo-600 dark:fill-indigo-400' : 'fill-slate-600 dark:fill-slate-300'}`}
+                                                >
+                                                    {primary}
+                                                </text>
+                                                <text
+                                                    y={isGateway ? 55 : 45}
+                                                    textAnchor="middle"
+                                                    className="text-[9px] select-none pointer-events-none fill-slate-400 dark:fill-slate-500"
+                                                >
+                                                    {device.ip_address}
+                                                </text>
+                                            </>
+                                        );
+                                    })()}
                                 </g>
                             );
                         })}

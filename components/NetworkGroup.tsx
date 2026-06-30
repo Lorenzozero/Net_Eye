@@ -17,6 +17,10 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
     const [editingDevice, setEditingDevice] = useState<string | null>(null);
     const [tempHostname, setTempHostname] = useState('');
 
+    // Gateway della subnet (per mostrarne hostname/vendor nell'header)
+    const gw = devices.find((d) => d.device_type === 'gateway' || d.device_type === 'router' || d.ip_address.endsWith('.1'));
+    const gwLabel = gw ? (gw.hostname || gw.vendor || gw.ip_address) : null;
+
     const startEditing = (device: Device) => {
         setEditingDevice(device.ip_address);
         setTempHostname(device.hostname || '');
@@ -46,15 +50,20 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
                             <button onClick={() => setIsEditingName(false)} className="ml-2 text-green-600"><Check className="w-4 h-4" /></button>
                         </div>
                     ) : (
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center group">
-                            {networkName}
-                            <button
-                                onClick={() => setIsEditingName(true)}
-                                className="ml-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition-opacity"
-                            >
-                                <Edit2 className="w-3 h-3" />
-                            </button>
-                        </h3>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center group">
+                                {networkName}
+                                <button
+                                    onClick={() => setIsEditingName(true)}
+                                    className="ml-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition-opacity"
+                                >
+                                    <Edit2 className="w-3 h-3" />
+                                </button>
+                            </h3>
+                            {gwLabel && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Gateway: <span className="font-medium text-gray-700 dark:text-gray-300">{gwLabel}</span></span>
+                            )}
+                        </div>
                     )}
                 </div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -100,7 +109,10 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
                                             </button>
                                         </div>
                                     )}
-                                    <div className="text-xs text-gray-500">{device.vendor}</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="capitalize text-indigo-600 dark:text-indigo-400">{device.device_type?.replace('_', ' ') || '—'}</span>
+                                        {device.os ? ` · ${device.os}` : ''} · {device.vendor || 'Vendor sconosciuto'}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1">
@@ -116,10 +128,13 @@ export default function NetworkGroup({ subnet, devices, onUpdateDevice }: Networ
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-right text-sm font-medium">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${device.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${device.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                         }`}>
                                         {device.is_active ? 'Online' : 'Offline'}
                                     </span>
+                                    {device.last_seen && (
+                                        <div className="text-xs text-gray-400 mt-1">{new Date(device.last_seen).toLocaleString('it-IT')}</div>
+                                    )}
                                 </td>
                             </tr>
                         ))}
