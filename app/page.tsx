@@ -157,15 +157,15 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Reti Monitorate</p>
-              <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">1</p>
+              <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{Object.keys(groupedDevices).length || 0}</p>
             </div>
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <Wifi className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-blue-600 dark:text-blue-400 font-medium">192.168.1.0/24</span>
-            <span className="text-gray-400 ml-2">subnets</span>
+            <span className="text-blue-600 dark:text-blue-400 font-medium truncate">{Object.keys(groupedDevices)[0] || '—'}</span>
+            <span className="text-gray-400 ml-2">{Object.keys(groupedDevices).length > 1 ? `+${Object.keys(groupedDevices).length - 1} altre` : 'subnet'}</span>
           </div>
         </div>
 

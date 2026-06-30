@@ -45,6 +45,7 @@ oui-db.json
 # stato persistente dello scanner e log del backend (runtime)
 state.json
 backend.log
+.agent-id
 
 # typescript
 *.tsbuildinfo

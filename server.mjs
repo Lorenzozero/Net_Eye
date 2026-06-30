@@ -18,6 +18,45 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const PORT = 8000;
 const isWin = process.platform === 'win32';
 const CACHE_FILE = new URL('./.vendor-cache.json', import.meta.url);
+const AGENT_VERSION = '3.0.0';
+
+// ---- Modalità: SERVER (collector + API + scanner locale) oppure AGENT (riporta a un server remoto) ----
+//   node server.mjs                          → server (default)
+//   node server.mjs --agent http://host:8000 → agente che scansiona e riporta al server remoto
+const _args = process.argv.slice(2);
+const _ai = _args.indexOf('--agent');
+const AGENT_TARGET = _ai >= 0 ? _args[_ai + 1] : (process.env.NS_AGENT_TARGET || null);
+const AGENT_MODE = !!AGENT_TARGET;
+
+// Identità agente persistente (stabile fra i riavvii). Override per test/multi-istanza con NS_AGENT_ID.
+const AGENT_ID_FILE = new URL('./.agent-id', import.meta.url);
+const AGENT_ID = process.env.NS_AGENT_ID || (() => {
+  try { const v = readFileSync(AGENT_ID_FILE, 'utf8').trim(); if (v) return v; } catch {}
+  const id = `agt-${os.hostname()}-${Math.random().toString(36).slice(2, 8)}`;
+  try { writeFileSync(AGENT_ID_FILE, id); } catch {}
+  return id;
+})();
+const osName = () => (isWin ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux');
+
+// ---- Scansione "educata" (poco rumore di rete) ----
+const FULL_INTERVAL = 5 * 60 * 1000;   // sweep ICMP completo: raro
+const LIGHT_INTERVAL = 45 * 1000;      // ciclo leggero (solo ARP, nessun pacchetto extra): frequente
+const jitter = (ms) => Math.round(ms + (Math.random() - 0.5) * ms * 0.3); // ±15% per non sincronizzare gli agent
+
+// POST JSON minimale (per la comunicazione agent → server)
+function postJson(url, obj) {
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(url);
+      const data = JSON.stringify(obj);
+      const lib = u.protocol === 'https:' ? https : http;
+      const req = lib.request(u, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }, timeout: 8000 }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.write(data); req.end();
+    } catch { resolve(null); }
+  });
+}
 
 // Porte usate per il fingerprint del tipo di dispositivo (scan rapido su ogni host attivo).
 const FINGERPRINT_PORTS = [
@@ -108,6 +147,7 @@ let scanning = false;
 const traffic = [];        // serie temporale: { time, download(KB/s), upload(KB/s), rxPps, txPps }
 let lastCounters = null;   // ultimo snapshot dei contatori interfaccia
 const removedAgents = new Set(); // agenti eliminati dall'utente (non vengono ri-mostrati)
+const remoteAgents = new Map();  // id → { info, devices, traffic, connections, lastReport, registered_at } (agenti su altre macchine/reti)
 
 // Registro persistente dei dispositivi (storico) — sopravvive al riavvio del backend.
 const registry = new Map();                         // key (mac|ip) → device con storico
@@ -537,7 +577,56 @@ async function enrichDevice(dev, upnp) {
   dev.enriched_at = Date.now();
 }
 
-async function scanNetwork() {
+// Aggiorna il registro a partire dagli host "vivi". Condiviso da full e light scan.
+async function processLive(live, pingInfo, arp, upnpByIp, markOffline) {
+  const nowISO = new Date().toISOString();
+  const now = Date.now();
+  const liveKeys = new Set();
+  const toEnrich = [];
+  let newCount = 0;
+
+  for (const ip of live) {
+    const mac = arp[ip] || (ip === local.ip ? local.mac : null);
+    const key = deviceKey(mac, ip);
+    liveKeys.add(key);
+    let dev = registry.get(key);
+    const isNew = !dev;
+    if (isNew) {
+      dev = { first_seen: nowISO, seen_count: 0, enriched_at: 0, open_ports: [], banners: {}, upnp: null, vendor: 'Unknown', device_type: 'desktop', os: null };
+      registry.set(key, dev);
+      newCount++;
+    }
+    dev.ip_address = ip;
+    dev.mac_address = mac;
+    dev.is_active = true;
+    dev.last_seen = nowISO;
+    dev.seen_count = (dev.seen_count || 0) + 1;
+    const pInfo = pingInfo[ip] || {};
+    if (pInfo.ttl != null) dev.ttl = pInfo.ttl;
+    if (pInfo.rtt != null) dev.latency = pInfo.rtt;
+    if (isNew || now - (dev.enriched_at || 0) > ENRICH_TTL) toEnrich.push([dev, upnpByIp[ip]]);
+  }
+
+  // Arricchimento SOLO per device nuovi o stale → cicli successivi molto più leggeri
+  await mapLimit(toEnrich, 8, async ([dev, upnp]) => { await enrichDevice(dev, upnp); });
+
+  // Marca offline + pruning solo dopo uno sweep ICMP completo (l'ARP da solo non è affidabile)
+  if (markOffline) {
+    for (const [key, dev] of registry) {
+      if (!liveKeys.has(key)) {
+        dev.is_active = false;
+        if (now - new Date(dev.last_seen).getTime() > PRUNE_TTL) registry.delete(key);
+      }
+    }
+  }
+
+  publishDevices();
+  saveState();
+  return { newCount, enriched: toEnrich.length };
+}
+
+// Sweep ICMP completo (rumoroso) — eseguito di rado.
+async function fullScan() {
   if (scanning) return;
   scanning = true;
   const t0 = Date.now();
@@ -545,8 +634,8 @@ async function scanNetwork() {
     const ips = Array.from({ length: 254 }, (_, i) => `${local.base}.${i + 1}`);
     const live = new Set();
     const pingInfo = {};
-    const ssdpPromise = ssdpDiscover(3000);   // discovery UPnP in parallelo al ping-sweep
-    const BATCH = 48;                          // concorrenza ping più alta
+    const ssdpPromise = ssdpDiscover(3000);
+    const BATCH = 48;
     for (let i = 0; i < ips.length; i += BATCH) {
       const res = await Promise.all(ips.slice(i, i + BATCH).map(async (ip) => {
         const r = await ping(ip);
@@ -558,62 +647,48 @@ async function scanNetwork() {
     if (local.ip) live.add(local.ip);
     const arp = await arpTable();
     Object.keys(arp).forEach((ip) => { if (ip.startsWith(local.base + '.')) live.add(ip); });
-
     const ssdp = await ssdpPromise;
     const upnpByIp = {};
     await Promise.all(Object.entries(ssdp).map(async ([ip, info]) => {
       const desc = info.location ? await fetchUpnpDesc(info.location) : null;
       upnpByIp[ip] = { server: info.server, ...(desc || {}) };
     }));
-
-    const nowISO = new Date().toISOString();
-    const now = Date.now();
-    const liveKeys = new Set();
-    const toEnrich = [];
-    let newCount = 0;
-
-    for (const ip of live) {
-      const mac = arp[ip] || (ip === local.ip ? local.mac : null);
-      const key = deviceKey(mac, ip);
-      liveKeys.add(key);
-      let dev = registry.get(key);
-      const isNew = !dev;
-      if (isNew) {
-        dev = { first_seen: nowISO, seen_count: 0, enriched_at: 0, open_ports: [], banners: {}, upnp: null, vendor: 'Unknown', device_type: 'desktop', os: null };
-        registry.set(key, dev);
-        newCount++;
-      }
-      dev.ip_address = ip;
-      dev.mac_address = mac;
-      dev.is_active = true;
-      dev.last_seen = nowISO;
-      dev.seen_count = (dev.seen_count || 0) + 1;
-      const pInfo = pingInfo[ip] || {};
-      dev.ttl = pInfo.ttl ?? dev.ttl ?? null;
-      dev.latency = pInfo.rtt ?? null;
-      if (isNew || now - (dev.enriched_at || 0) > ENRICH_TTL) toEnrich.push([dev, upnpByIp[ip]]);
-    }
-
-    // Arricchimento SOLO per device nuovi o stale → enorme risparmio sui cicli successivi
-    await mapLimit(toEnrich, 8, async ([dev, upnp]) => { await enrichDevice(dev, upnp); });
-
-    // Offline + pruning dei device spariti da troppo tempo
-    for (const [key, dev] of registry) {
-      if (!liveKeys.has(key)) {
-        dev.is_active = false;
-        if (now - new Date(dev.last_seen).getTime() > PRUNE_TTL) registry.delete(key);
-      }
-    }
-
-    publishDevices();
-    saveState();
+    const { newCount, enriched } = await processLive(live, pingInfo, arp, upnpByIp, true);
     const active = devices.filter((d) => d.is_active).length;
-    console.log(`✅ ${active}/${devices.length} attivi · ${newCount} nuovi · ${toEnrich.length} arricchiti in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    console.log(`✅ full ${active}/${devices.length} attivi · ${newCount} nuovi · ${enriched} arricchiti in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (e) {
-    console.error('Errore scansione:', e.message);
+    console.error('Errore full scan:', e.message);
   } finally {
     scanning = false;
   }
+}
+
+// Ciclo leggero: legge solo la tabella ARP (nessun pacchetto extra in rete) → presenza silenziosa.
+async function lightScan() {
+  if (scanning) return;
+  scanning = true;
+  try {
+    const arp = await arpTable();
+    const live = new Set();
+    Object.keys(arp).forEach((ip) => { if (ip.startsWith(local.base + '.')) live.add(ip); });
+    if (local.ip) live.add(local.ip);
+    await processLive(live, {}, arp, {}, false); // niente ping/SSDP, non marca offline
+  } catch (e) {
+    console.error('Errore light scan:', e.message);
+  } finally {
+    scanning = false;
+  }
+}
+
+// Compatibilità: "Avvia Scansione" e codice esistente → sweep completo.
+const scanNetwork = fullScan;
+
+// Scheduler educato: light frequente (silenzioso) + full raro, con jitter anti-sincronizzazione.
+function startScanScheduler(after) {
+  const loopLight = async () => { await lightScan(); if (after) await after(); setTimeout(loopLight, jitter(LIGHT_INTERVAL)); };
+  const loopFull = async () => { await fullScan(); if (after) await after(); setTimeout(loopFull, jitter(FULL_INTERVAL)); };
+  setTimeout(loopLight, jitter(LIGHT_INTERVAL));
+  setTimeout(loopFull, jitter(FULL_INTERVAL));
 }
 
 // ---- Monitoraggio TRAFFICO reale (contatori interfaccia di sistema) ----
@@ -712,6 +787,59 @@ async function getConnections() {
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const startedAt = Date.now();
 
+function localAgentDescriptor() {
+  return {
+    agent_id: AGENT_ID, agent_ip: local.ip || '127.0.0.1', agent_hostname: os.hostname(),
+    agent_os: osName(), agent_version: AGENT_VERSION, subnet: `${local.base}.0/24`,
+  };
+}
+
+// Lista agenti: scanner locale (embedded) + agenti remoti che hanno riportato.
+function listAgents() {
+  // auto-pulizia degli agenti remoti che non riportano da oltre 1 ora
+  for (const [id, a] of remoteAgents) if (Date.now() - a.lastReport > 3_600_000) remoteAgents.delete(id);
+  const out = [];
+  if (!removedAgents.has(AGENT_ID)) {
+    out.push({
+      ...localAgentDescriptor(),
+      status: scanning ? 'scanning' : 'online',
+      device_count: devices.filter((d) => d.is_active).length,
+      last_seen: new Date().toISOString(), registered_at: new Date(startedAt).toISOString(), local: true,
+    });
+  }
+  for (const a of remoteAgents.values()) {
+    if (removedAgents.has(a.info.agent_id)) continue;
+    const online = Date.now() - a.lastReport < 90_000;
+    out.push({
+      ...a.info, status: online ? 'online' : 'offline',
+      device_count: (a.devices || []).filter((d) => d.is_active).length,
+      last_seen: new Date(a.lastReport).toISOString(),
+      registered_at: new Date(a.registered_at || a.lastReport).toISOString(), local: false,
+    });
+  }
+  return out;
+}
+
+// Dispositivi aggregati: locali + di tutti gli agenti remoti, dedup per (MAC|rete), con attribuzione.
+function aggregatedDevices() {
+  if (remoteAgents.size === 0) return devices; // caso comune: solo scanner locale
+  const byKey = new Map();
+  const add = (d, agentName, network) => {
+    const key = deviceKey(d.mac_address, d.ip_address) + '|' + network;
+    const ex = byKey.get(key);
+    if (!ex || (d.open_ports?.length || 0) > (ex.open_ports?.length || 0)) byKey.set(key, { ...d, agent: agentName, network });
+  };
+  const localNet = `${local.base}.0/24`;
+  for (const d of devices) add(d, os.hostname(), localNet);
+  for (const a of remoteAgents.values()) {
+    if (removedAgents.has(a.info.agent_id)) continue;
+    for (const d of (a.devices || [])) add(d, a.info.agent_hostname || a.info.agent_id, a.info.subnet || 'remota');
+  }
+  const all = [...byKey.values()].sort((x, y) => ipKey(x.ip_address).localeCompare(ipKey(y.ip_address)));
+  all.forEach((d, i) => (d.id = i + 1));
+  return all;
+}
+
 const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
@@ -721,7 +849,7 @@ const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, `http://localhost:${PORT}`);
   const parts = pathname.split('/').filter(Boolean);
 
-  if (req.method === 'GET' && pathname === '/api/v1/devices') return json(res, 200, devices);
+  if (req.method === 'GET' && pathname === '/api/v1/devices') return json(res, 200, aggregatedDevices());
 
   if (req.method === 'GET' && pathname === '/api/v1/connections') {
     return json(res, 200, await getConnections());
@@ -776,17 +904,52 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/api/v1/agents') {
-    const agents = removedAgents.has('local-scanner') ? [] : [{
-      agent_id: 'local-scanner', agent_ip: local.ip || '127.0.0.1', agent_hostname: os.hostname(),
-      agent_os: isWin ? 'Windows' : (process.platform === 'darwin' ? 'macOS' : 'Linux'),
-      agent_version: '2.0.0', status: scanning ? 'scanning' : 'online',
-      last_seen: new Date().toISOString(), registered_at: new Date(startedAt).toISOString(),
-    }];
-    return json(res, 200, { agents });
+    return json(res, 200, { agents: listAgents() });
+  }
+
+  // Un agente remoto si registra
+  if (req.method === 'POST' && pathname === '/api/v1/agents/register') {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      try {
+        const info = JSON.parse(raw || '{}');
+        if (info.agent_id) {
+          const ex = remoteAgents.get(info.agent_id);
+          remoteAgents.set(info.agent_id, { info, devices: ex?.devices || [], traffic: ex?.traffic || null, connections: ex?.connections || [], lastReport: Date.now(), registered_at: ex?.registered_at || Date.now() });
+          removedAgents.delete(info.agent_id);
+          console.log(`🔗 Agente registrato: ${info.agent_hostname} (${info.subnet})`);
+        }
+      } catch {}
+      json(res, 200, { message: 'registrato' });
+    });
+    return;
+  }
+
+  // Un agente remoto invia il suo report (dispositivi, traffico, connessioni)
+  if (req.method === 'POST' && parts[2] === 'agents' && parts[4] === 'report' && parts[3]) {
+    const id = parts[3];
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      try {
+        const body = JSON.parse(raw || '{}');
+        const ex = remoteAgents.get(id);
+        remoteAgents.set(id, {
+          info: body.info || ex?.info || { agent_id: id },
+          devices: body.devices || [], traffic: body.traffic || null, connections: body.connections || [],
+          lastReport: Date.now(), registered_at: ex?.registered_at || Date.now(),
+        });
+        removedAgents.delete(id);
+      } catch {}
+      json(res, 200, { message: 'ok' });
+    });
+    return;
   }
 
   if (req.method === 'DELETE' && parts[2] === 'agents' && parts[3]) {
     removedAgents.add(parts[3]);
+    remoteAgents.delete(parts[3]);
     saveState();
     return json(res, 200, { message: 'agente rimosso' });
   }
@@ -794,12 +957,41 @@ const server = createServer(async (req, res) => {
   json(res, 404, { error: 'rotta non gestita' });
 });
 
-server.listen(PORT, () => {
-  console.log(`🛰️  NetworkScope backend v2 su http://localhost:${PORT}`);
+function startupLog() {
   console.log(`   Subnet: ${local.base}.0/24 · host: ${local.ip} · OUI: ${Object.keys(OUI).length}${OUI_DB ? ` + DB IEEE ${Object.keys(OUI_DB).length}` : ' (esegui npm run oui per il DB completo)'} · cache: ${vendorCache.size}`);
-  loadState();                           // ripristina lo storico dispositivi dal disco
-  scanNetwork();
-  setInterval(scanNetwork, 60_000);
-  sampleTraffic();                       // primo campione traffico
-  setInterval(sampleTraffic, 2000);      // throughput live ogni 2s
-});
+}
+
+// Invio del report al server remoto (modalità agente)
+async function reportToServer() {
+  const connections = await getConnections();
+  const current = traffic[traffic.length - 1] || { download: 0, upload: 0, rxPps: 0, txPps: 0 };
+  await postJson(`${AGENT_TARGET}/api/v1/agents/${AGENT_ID}/report`, {
+    info: localAgentDescriptor(),
+    devices,
+    traffic: { history: traffic, current, totals: lastCounters },
+    connections,
+  });
+}
+
+if (AGENT_MODE) {
+  // ── MODALITÀ AGENTE: scansiona la rete locale e riporta a un server remoto ──
+  console.log(`🛰️  NetworkScope AGENTE ${AGENT_ID} → riporta a ${AGENT_TARGET}`);
+  startupLog();
+  loadState();
+  postJson(`${AGENT_TARGET}/api/v1/agents/register`, localAgentDescriptor());
+  fullScan().then(reportToServer);
+  startScanScheduler(reportToServer);
+  sampleTraffic();
+  setInterval(sampleTraffic, 2000);
+} else {
+  // ── MODALITÀ SERVER: collector + API + scanner locale embedded ──
+  server.listen(PORT, () => {
+    console.log(`🛰️  NetworkScope server su http://localhost:${PORT}  (agente locale ${AGENT_ID})`);
+    startupLog();
+    loadState();
+    fullScan();
+    startScanScheduler();                 // light (silenzioso) frequente + full raro, con jitter
+    sampleTraffic();
+    setInterval(sampleTraffic, 2000);     // throughput live ogni 2s
+  });
+}

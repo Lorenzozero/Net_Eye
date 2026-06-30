@@ -32,4 +32,7 @@ export interface Agent {
     status: string;
     last_seen: string;
     registered_at: string;
+    subnet?: string;
+    device_count?: number;
+    local?: boolean;
 }

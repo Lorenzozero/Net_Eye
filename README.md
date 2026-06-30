@@ -175,13 +175,21 @@ Tutte le tecniche sono **attive e reali**, implementate in `server.mjs` con i so
 |---|---|---|
 | **Security risk scoring** | porte pericolose esposte (Telnet, SMB, RDP, VNC, DB…) + n° porte + vendor ignoto | punteggio 0–100 e livello **basso/medio/alto** con evidenze |
 
-### ⚡ Performance e persistenza
+### 🛰️ Architettura agent ↔ server (multi-rete)
+Un solo codice, due modalità:
+- **Server** (`npm run backend`): collector + API + **agente locale embedded** che scansiona la propria rete.
+- **Agente** (`npm run agent -- --agent http://SERVER:8000`): scansiona la rete locale e **riporta al server** via HTTP.
+
+Il server **aggrega più agenti**, sulla stessa rete o su reti diverse: ogni agente ha un `agent_id` persistente, e nei dispositivi viene tracciata la **rete di provenienza** (dedup per MAC per rete). La pagina **Impostazioni** mostra tutti gli agenti con rete, n° dispositivi e stato online/offline (heartbeat 90s).
+
+### ⚡ Performance, politeness e persistenza
 | Tecnica | Come funziona | Beneficio |
 |---|---|---|
-| **Scansione incrementale** | l'arricchimento pesante (porte, banner, UPnP) viene eseguito solo per i dispositivi **nuovi o "stale"** (TTL 5 min); gli altri ricevono solo l'aggiornamento di stato | cicli ~3× più veloci (es. da 27s a <10s) |
-| **Registro persistente** | lo stato dei dispositivi è salvato su `state.json` con **storico** (`first_seen`, `last_seen`, `seen_count`) | i dispositivi noti ricompaiono **subito** al riavvio del backend |
-| **Tracciamento online/offline** | i device spariti restano in elenco come *offline* e vengono rimossi dopo 30 min | si vede cosa è scomparso dalla rete |
-| **Autostart a livello utente** | `npm run autostart:install` registra un avvio al login (Startup `.vbs` su Windows, `.desktop` su Linux, LaunchAgent su macOS) | lo scanner **sopravvive al riavvio del PC** senza permessi admin né servizi critici |
+| **Scansione incrementale** | l'arricchimento pesante (porte, banner, UPnP) viene eseguito solo per i dispositivi **nuovi o "stale"** (TTL 5 min) | cicli ~3× più veloci (es. da 27s a <10s) |
+| **Scansione educata (poco rumore)** | ciclo **leggero ogni 45s** che legge **solo la tabella ARP** (nessun pacchetto extra in rete) + sweep ICMP completo **raro** (5 min), con **jitter** anti-sincronizzazione tra agenti | drastica riduzione del traffico ICMP sulla rete |
+| **Registro persistente** | stato su `state.json` con **storico** (`first_seen`, `last_seen`, `seen_count`) | i device noti ricompaiono **subito** al riavvio |
+| **Tracciamento online/offline** | i device spariti restano *offline* e vengono rimossi dopo 30 min | si vede cosa è scomparso dalla rete |
+| **Autostart a livello utente** | `npm run autostart:install` (opz. `-- --agent http://SERVER:8000` per la modalità agente) registra un avvio al login (Startup `.vbs` Windows, `.desktop` Linux, LaunchAgent macOS) | scanner/agente **sopravvive al riavvio del PC** senza admin né servizi critici |
 
 > ⚠️ **Limiti onesti:** l'analisi dei flussi riguarda la **macchina che esegue lo scanner** (la sua socket table); per vedere il traffico *di altri* dispositivi servirebbe una porta mirror/gateway o packet-capture. Il **deep packet inspection** per-protocollo richiederebbe Npcap + privilegi (in roadmap).
 
@@ -227,6 +235,7 @@ npm run dev
 | Comando | Azione |
 |---|---|
 | `npm run backend` | 🛰️ Backend di scansione **reale** della rete (porta 8000) |
+| `npm run agent -- --agent http://SERVER:8000` | 🛰️ Avvia un **agente** che scansiona la rete locale e riporta a un server remoto |
 | `npm run mock` | 🧪 Backend finto con dati demo (porta 8000) |
 | `npm run oui` | 🏷️ Scarica il DB OUI IEEE completo (~40k vendor) per la risoluzione offline |
 | `npm run autostart:install` | 🔁 Avvio automatico dello scanner al login (livello utente, **no admin**) |
@@ -373,6 +382,8 @@ interface Device {
 - [x] 📤 Export report CSV / PDF
 - [x] ⚡ Scansione incrementale + registro persistente con storico
 - [x] 🔁 Autostart dello scanner al login (livello utente, no admin)
+- [x] 🛰️ Architettura agent ↔ server multi-rete (più agenti, una dashboard)
+- [x] 🤫 Scansione "educata" (ciclo ARP silenzioso + sweep ICMP raro con jitter)
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi
 - [ ] 🧪 Test automatici (Vitest + Playwright)

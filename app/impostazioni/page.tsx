@@ -205,6 +205,8 @@ export default function ImpostazioniPage() {
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stato</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Hostname</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rete</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dispositivi</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sistema</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Versione</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ultimo Contatto</th>
@@ -229,6 +231,13 @@ export default function ImpostazioniPage() {
                                                     </td>
                                                     <td className="px-4 py-4 whitespace-nowrap">
                                                         <span className="font-mono text-sm text-gray-700 dark:text-gray-300">{agent.agent_ip}</span>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+                                                        <span className="font-mono text-xs text-gray-600 dark:text-gray-300">{agent.subnet || '—'}</span>
+                                                        {agent.local && <span className="ml-1 text-[10px] px-1 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">locale</span>}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                                                        {typeof agent.device_count === 'number' ? agent.device_count : '—'}
                                                     </td>
                                                     <td className="px-4 py-4 whitespace-nowrap">
                                                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${agent.agent_os === 'Windows'
