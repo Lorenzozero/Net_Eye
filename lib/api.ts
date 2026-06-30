@@ -75,6 +75,7 @@ export interface Connection {
     remoteIp: string;
     remotePort: number;
     remoteHost: string | null;
+    org?: string | null;
     service: string;
     proto: string;
     count: number;

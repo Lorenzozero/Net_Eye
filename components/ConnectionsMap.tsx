@@ -8,7 +8,7 @@ const short = (c: Connection) => {
     return name.length > 22 ? name.slice(0, 20) + '…' : name;
 };
 
-export default function ConnectionsMap({ connections }: { connections: Connection[] }) {
+export default function ConnectionsMap({ connections, onSelect }: { connections: Connection[]; onSelect?: (c: Connection) => void }) {
     const top = connections.slice(0, 16);
     if (!top.length) {
         return <div className="h-full flex items-center justify-center text-sm text-gray-400">Nessuna connessione attiva rilevata</div>;
@@ -41,8 +41,9 @@ export default function ConnectionsMap({ connections }: { connections: Connectio
                 const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
                 const color = c.scope === 'LAN' ? '#16a34a' : '#4f46e5';
                 return (
-                    <g key={`node-${i}`}>
-                        <circle cx={x} cy={y} r="16" fill="white" className="dark:fill-gray-800" stroke={color} strokeWidth="2" />
+                    <g key={`node-${i}`} onClick={() => onSelect?.(c)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
+                        <circle cx={x} cy={y} r="20" fill="transparent" />
+                        <circle cx={x} cy={y} r="16" fill="white" className="dark:fill-gray-800 transition-all hover:stroke-[3]" stroke={color} strokeWidth="2" />
                         <foreignObject x={x - 9} y={y - 9} width="18" height="18">
                             <Globe width="100%" height="100%" color={color} />
                         </foreignObject>

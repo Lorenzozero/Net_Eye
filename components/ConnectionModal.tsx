@@ -44,7 +44,8 @@ export default function ConnectionModal({ conn, onClose }: { conn: Connection; o
                             <span className={conn.scope === 'LAN' ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}>{conn.scope}</span>
                         </Field>
                         <Field label="Connessioni">{conn.count}</Field>
-                        {conn.remoteHost && <Field label="Host remoto"><span className="break-all">{conn.remoteHost}</span></Field>}
+                        {conn.org && <Field label="Organizzazione"><span className="break-all">{conn.org}</span></Field>}
+                        {conn.remoteHost && conn.remoteHost !== conn.org && <Field label="Host remoto"><span className="break-all">{conn.remoteHost}</span></Field>}
                     </div>
                 </div>
 

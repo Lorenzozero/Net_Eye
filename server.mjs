@@ -175,7 +175,8 @@ function publishDevices() {
 const vendorCache = loadCache();
 const vendorQueue = [];
 let queueRunning = false;
-const dnsCache = new Map(); // ip → hostname (per le destinazioni delle connessioni)
+const dnsCache = new Map(); // ip → hostname PTR (reverse DNS)
+const orgCache = new Map(); // ip → organizzazione/ISP (per IP senza PTR)
 
 // Porta → servizio/protocollo applicativo (per capire "di che pacchetti si tratta")
 const SERVICES = {
@@ -748,6 +749,26 @@ async function reverseDnsT(ip) {
   return Promise.race([reverseDns(ip), new Promise((r) => setTimeout(() => r(null), 1500))]);
 }
 
+// Lookup dell'organizzazione/ISP per gli IP pubblici senza PTR (ip-api.com, gratuito, best-effort).
+function lookupOrg(ip) {
+  return new Promise((resolve) => {
+    try {
+      const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as`, { timeout: 1500 }, (res) => {
+        let b = '';
+        res.on('data', (c) => (b += c));
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(b);
+            resolve(j.status === 'success' ? (j.org || j.isp || (j.as || '').replace(/^AS\d+\s*/, '') || null) : null);
+          } catch { resolve(null); }
+        });
+      });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+    } catch { resolve(null); }
+  });
+}
+
 async function getConnections() {
   const out = await run(isWin ? 'netstat -ano' : "ss -tn state established 2>/dev/null || netstat -tn");
   const agg = new Map();
@@ -770,12 +791,18 @@ async function getConnections() {
     agg.set(key, e);
   }
   const list = [...agg.values()].map((e) => ({ ...e, localIps: [...e.localIps] }));
-  // reverse DNS delle destinazioni (con cache e timeout)
+  // Risoluzione destinazioni: reverse DNS (PTR) + lookup organizzazione per gli IP pubblici senza PTR.
   await Promise.all([...new Set(list.map((e) => e.remoteIp))].map(async (ip) => {
     if (!dnsCache.has(ip)) dnsCache.set(ip, await reverseDnsT(ip));
+    if (!dnsCache.get(ip) && !orgCache.has(ip) && !ip.startsWith(local.base + '.')) {
+      orgCache.set(ip, await lookupOrg(ip));
+    }
   }));
   for (const e of list) {
-    e.remoteHost = dnsCache.get(e.remoteIp) || null;
+    const ptr = dnsCache.get(e.remoteIp) || null;
+    const org = orgCache.get(e.remoteIp) || null;
+    e.remoteHost = ptr || (org ? `${org}` : null);
+    e.org = org;
     const dev = devices.find((d) => d.ip_address === e.localIps[0]);
     e.fromHost = dev?.hostname || (e.localIps[0] === local.ip ? os.hostname() : e.localIps[0]);
   }

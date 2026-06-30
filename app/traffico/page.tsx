@@ -130,7 +130,7 @@ export default function TrafficoPage() {
                     </h3>
                     <p className="text-xs text-gray-400 mb-2">Connessioni in uscita da questo host verso le destinazioni, etichettate per protocollo.</p>
                     <div className="h-[480px]">
-                        <ConnectionsMap connections={connections} />
+                        <ConnectionsMap connections={connections} onSelect={setSelConn} />
                     </div>
                 </div>
 
