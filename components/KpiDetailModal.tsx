@@ -1,13 +1,13 @@
 'use client';
 
 import { Device } from '@/types';
-import { X, Server, Zap, Wifi, AlertTriangle } from 'lucide-react';
+import { X, Server, Wifi, AlertTriangle, PowerOff } from 'lucide-react';
 
 type DetailKind = 'total' | 'online' | 'networks' | 'alerts';
 
 const TITLES: Record<DetailKind, { title: string; icon: React.ReactNode; color: string }> = {
     total: { title: 'Tutti i dispositivi', icon: <Server className="w-5 h-5" />, color: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900/30' },
-    online: { title: 'Dispositivi online', icon: <Zap className="w-5 h-5" />, color: 'text-green-600 bg-green-100 dark:bg-green-900/30' },
+    online: { title: 'Dispositivi offline', icon: <PowerOff className="w-5 h-5" />, color: 'text-gray-600 bg-gray-100 dark:bg-gray-700' },
     networks: { title: 'Reti monitorate', icon: <Wifi className="w-5 h-5" />, color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' },
     alerts: { title: 'Avvisi di sicurezza', icon: <AlertTriangle className="w-5 h-5" />, color: 'text-orange-600 bg-orange-100 dark:bg-orange-900/30' },
 };
@@ -42,7 +42,28 @@ export default function KpiDetailModal({ kind, devices, onClose }: { kind: Detai
 
     let body: React.ReactNode = null;
     if (kind === 'total') body = <DeviceTable devices={devices} />;
-    else if (kind === 'online') body = <DeviceTable devices={devices.filter((d) => d.is_active)} />;
+    else if (kind === 'online') {
+        const offline = devices.filter((d) => !d.is_active);
+        body = offline.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">Nessun dispositivo offline — sono tutti online 🎉</p>
+        ) : (
+            <div className="space-y-2">
+                {offline.map((d) => (
+                    <div key={d.ip_address} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
+                        <div>
+                            <span className="font-medium text-gray-900 dark:text-white">{d.hostname || d.vendor || d.device_type}</span>
+                            <span className="ml-2 font-mono text-xs text-gray-500">{d.ip_address}</span>
+                            <div className="text-xs text-gray-400 capitalize">{d.device_type?.replace('_', ' ')}{d.vendor ? ` · ${d.vendor}` : ''}</div>
+                        </div>
+                        <div className="text-right">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Offline</span>
+                            {d.last_seen && <div className="text-[11px] text-gray-400 mt-1">visto: {new Date(d.last_seen).toLocaleString('it-IT')}</div>}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
     else if (kind === 'networks') {
         const groups = devices.reduce((acc, d) => {
             const p = d.ip_address.split('.');
