@@ -1,14 +1,27 @@
 'use client';
 
+import { useState } from 'react';
 import { Device } from '@/types';
 import { serviceName } from '@/lib/services';
-import { X, Terminal } from 'lucide-react';
+import { getConnection } from '@/lib/connect';
+import TerminalModal from '@/components/TerminalModal';
+import { X, Terminal, ExternalLink, Plug } from 'lucide-react';
+
+type Term = { title: string; command: string; lines: string[] };
 
 export default function PortsModal({ devices, onClose }: { devices: Device[]; onClose: () => void }) {
+    const [term, setTerm] = useState<Term | null>(null);
+
     const withPorts = devices
         .filter((d) => d.open_ports && d.open_ports.length > 0)
         .sort((a, b) => (b.open_ports?.length || 0) - (a.open_ports?.length || 0));
     const totalPorts = devices.reduce((acc, d) => acc + (d.open_ports?.length || 0), 0);
+
+    const connect = (ip: string, port: number, banner?: string) => {
+        const info = getConnection(ip, port, serviceName(port), banner);
+        if (info.kind === 'web') window.open(info.url, '_blank', 'noopener');
+        else setTerm({ title: info.title, command: info.command, lines: info.lines });
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -36,11 +49,20 @@ export default function PortsModal({ devices, onClose }: { devices: Device[]; on
                             <div className="space-y-1">
                                 {(d.open_ports ?? []).map((port) => {
                                     const banner = d.banners?.[String(port)];
+                                    const info = getConnection(d.ip_address, port, serviceName(port), banner);
                                     return (
-                                        <div key={port} className="flex items-start gap-2 text-sm">
+                                        <div key={port} className="flex items-center gap-2 text-sm group">
                                             <span className="inline-flex items-center justify-center min-w-[3.5rem] px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-mono text-xs">{port}</span>
                                             <span className="font-medium text-gray-700 dark:text-gray-300">{serviceName(port)}</span>
-                                            {banner && <span className="text-xs text-gray-400 font-mono truncate" title={banner}>· {banner}</span>}
+                                            {banner && <span className="text-xs text-gray-400 font-mono truncate flex-1" title={banner}>· {banner}</span>}
+                                            <button
+                                                onClick={() => connect(d.ip_address, port, banner)}
+                                                title={info.kind === 'web' ? info.url : info.command}
+                                                className="ml-auto shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-600 hover:text-white transition-colors"
+                                            >
+                                                {info.kind === 'web' ? <ExternalLink className="w-3 h-3" /> : <Plug className="w-3 h-3" />}
+                                                {info.label}
+                                            </button>
                                         </div>
                                     );
                                 })}
@@ -49,6 +71,8 @@ export default function PortsModal({ devices, onClose }: { devices: Device[]; on
                     ))}
                 </div>
             </div>
+
+            {term && <TerminalModal title={term.title} command={term.command} lines={term.lines} onClose={() => setTerm(null)} />}
         </div>
     );
 }
