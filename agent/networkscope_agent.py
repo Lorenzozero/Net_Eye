@@ -130,6 +130,58 @@ def descriptor():
     }
 
 
+SERVICES = {20: "FTP", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS", 80: "HTTP",
+            110: "POP3", 123: "NTP", 135: "RPC", 139: "NetBIOS", 143: "IMAP", 389: "LDAP",
+            443: "HTTPS", 445: "SMB", 465: "SMTPS", 587: "SMTP", 993: "IMAPS", 995: "POP3S",
+            1883: "MQTT", 3306: "MySQL", 3389: "RDP", 5060: "SIP", 5432: "PostgreSQL",
+            5900: "VNC", 6379: "Redis", 8080: "HTTP", 8443: "HTTPS", 27017: "MongoDB"}
+_ptr_cache = {}
+
+
+def is_local_addr(ip):
+    return (not ip) or ip.startswith("127.") or ip in ("0.0.0.0", "*") or ip.startswith("169.254") or ip.startswith("224.")
+
+
+def connections():
+    """Connessioni TCP attive reali (netstat), aggregate per destinazione+servizio."""
+    cmd = ["netstat", "-ano"] if IS_WIN else ["netstat", "-tn"]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=6).stdout
+    except Exception:
+        return []
+    agg = {}
+    for line in out.splitlines():
+        if "ESTABLISHED" not in line:
+            continue
+        m = re.search(r"(\d+\.\d+\.\d+\.\d+):(\d+)\s+(\d+\.\d+\.\d+\.\d+):(\d+)", line)
+        if not m:
+            continue
+        lip, lport, rip, rport = m.group(1), int(m.group(2)), m.group(3), int(m.group(4))
+        if is_local_addr(rip) or rip == lip:
+            continue
+        service = SERVICES.get(rport) or SERVICES.get(lport) or ("porta %d" % rport)
+        key = rip + "|" + service
+        e = agg.get(key)
+        if not e:
+            e = {"remoteIp": rip, "remotePort": rport, "remoteHost": None, "service": service,
+                 "proto": "TCP", "count": 0, "scope": "LAN" if rip.startswith(BASE + ".") else "Internet",
+                 "localIps": [], "fromHost": socket.gethostname()}
+            agg[key] = e
+        e["count"] += 1
+        if lip not in e["localIps"]:
+            e["localIps"].append(lip)
+    conns = list(agg.values())
+    for e in conns:
+        if e["remoteIp"] not in _ptr_cache:
+            try:
+                _ptr_cache[e["remoteIp"]] = socket.gethostbyaddr(e["remoteIp"])[0]
+            except Exception:
+                _ptr_cache[e["remoteIp"]] = None
+        e["remoteHost"] = _ptr_cache[e["remoteIp"]]
+    conns.sort(key=lambda x: -x["count"])
+    return conns[:60]
+
+
 def post(path, obj):
     try:
         req = urllib.request.Request(
@@ -178,8 +230,9 @@ def main():
     while True:
         try:
             devices = scan()
-            ok = post("/api/v1/agents/%s/report" % AGENT_ID, {"info": descriptor(), "devices": devices})
-            print(time.strftime("%H:%M:%S"), "report:", len(devices), "dispositivi", "OK" if ok else "FALLITO")
+            conns = connections()
+            ok = post("/api/v1/agents/%s/report" % AGENT_ID, {"info": descriptor(), "devices": devices, "connections": conns})
+            print(time.strftime("%H:%M:%S"), "report:", len(devices), "dispositivi,", len(conns), "connessioni", "OK" if ok else "FALLITO")
         except Exception as e:
             print("errore:", e)
         time.sleep(FULL_INTERVAL)

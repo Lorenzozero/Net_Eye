@@ -13,6 +13,7 @@ import dgram from 'node:dgram';
 import dns from 'node:dns/promises';
 import os from 'node:os';
 import https from 'node:https';
+import crypto from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const PORT = 8000;
@@ -42,6 +43,76 @@ const osName = () => (isWin ? 'Windows' : process.platform === 'darwin' ? 'macOS
 const FULL_INTERVAL = 5 * 60 * 1000;   // sweep ICMP completo: raro
 const LIGHT_INTERVAL = 45 * 1000;      // ciclo leggero (solo ARP, nessun pacchetto extra): frequente
 const jitter = (ms) => Math.round(ms + (Math.random() - 0.5) * ms * 0.3); // ±15% per non sincronizzare gli agent
+
+// ---- WebSocket ↔ TCP proxy (terminale REALE verso ip:port di un dispositivo) ----
+const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+const isPrivateIp = (ip) =>
+  /^10\./.test(ip) || /^192\.168\./.test(ip) || /^127\./.test(ip) || /^169\.254\./.test(ip) ||
+  /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+
+function wsEncode(opcode, payload) {
+  const len = payload.length;
+  let header;
+  if (len < 126) header = Buffer.from([0x80 | opcode, len]);
+  else if (len < 65536) { header = Buffer.alloc(4); header[0] = 0x80 | opcode; header[1] = 126; header.writeUInt16BE(len, 2); }
+  else { header = Buffer.alloc(10); header[0] = 0x80 | opcode; header[1] = 127; header.writeBigUInt64BE(BigInt(len), 2); }
+  return Buffer.concat([header, payload]);
+}
+function wsSend(socket, data) {
+  const isStr = typeof data === 'string';
+  try { socket.write(wsEncode(isStr ? 0x1 : 0x2, isStr ? Buffer.from(data, 'utf8') : data)); } catch {}
+}
+function wsDecode(buf) {
+  if (buf.length < 2) return null;
+  const opcode = buf[0] & 0x0f;
+  const masked = (buf[1] & 0x80) !== 0;
+  let len = buf[1] & 0x7f;
+  let off = 2;
+  if (len === 126) { if (buf.length < 4) return null; len = buf.readUInt16BE(2); off = 4; }
+  else if (len === 127) { if (buf.length < 10) return null; len = Number(buf.readBigUInt64BE(2)); off = 10; }
+  let mask;
+  if (masked) { if (buf.length < off + 4) return null; mask = buf.subarray(off, off + 4); off += 4; }
+  if (buf.length < off + len) return null;
+  let payload = buf.subarray(off, off + len);
+  if (masked) { const out = Buffer.alloc(len); for (let i = 0; i < len; i++) out[i] = payload[i] ^ mask[i % 4]; payload = out; }
+  return { opcode, payload, rest: buf.subarray(off + len) };
+}
+
+// Gestisce un upgrade WebSocket → apre un socket TCP reale verso ip:port e fa da ponte bidirezionale.
+function handleWsUpgrade(req, socket) {
+  const { pathname, searchParams } = new URL(req.url, 'http://localhost');
+  if (pathname !== '/api/v1/connect') { socket.destroy(); return; }
+  const ip = searchParams.get('ip');
+  const port = Number(searchParams.get('port'));
+  const key = req.headers['sec-websocket-key'];
+  if (!ip || !port || !key) { socket.destroy(); return; }
+
+  const accept = crypto.createHash('sha1').update(key + WS_MAGIC).digest('base64');
+  socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' + `Sec-WebSocket-Accept: ${accept}\r\n\r\n`);
+
+  if (!isPrivateIp(ip)) { wsSend(socket, '\x1b[31mPer sicurezza sono consentite solo connessioni a IP della rete locale.\x1b[0m\r\n'); socket.end(); return; }
+
+  wsSend(socket, `\x1b[36mConnessione TCP reale a ${ip}:${port}...\x1b[0m\r\n`);
+  const target = net.connect({ host: ip, port, timeout: 8000 });
+  target.on('connect', () => wsSend(socket, `\x1b[32m✓ Socket aperto su ${ip}:${port}\x1b[0m\r\n`));
+  target.on('data', (b) => wsSend(socket, b));
+  target.on('timeout', () => { wsSend(socket, '\r\n\x1b[33m[timeout]\x1b[0m\r\n'); target.destroy(); });
+  target.on('error', (e) => { wsSend(socket, `\r\n\x1b[31m[errore] ${e.message}\x1b[0m\r\n`); try { socket.end(); } catch {} });
+  target.on('close', () => { wsSend(socket, '\r\n\x1b[90m[connessione chiusa]\x1b[0m\r\n'); try { socket.end(); } catch {} });
+
+  let buffer = Buffer.alloc(0);
+  socket.on('data', (chunk) => {
+    buffer = Buffer.concat([buffer, chunk]);
+    let f;
+    while ((f = wsDecode(buffer))) {
+      buffer = f.rest;
+      if (f.opcode === 0x8) { try { target.end(); } catch {} try { socket.end(); } catch {} return; }
+      if (f.opcode === 0x1 || f.opcode === 0x2) { try { target.write(f.payload); } catch {} }
+    }
+  });
+  socket.on('error', () => { try { target.destroy(); } catch {} });
+  socket.on('close', () => { try { target.destroy(); } catch {} });
+}
 
 // POST JSON minimale (per la comunicazione agent → server)
 function postJson(url, obj) {
@@ -929,7 +1000,13 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && pathname === '/api/v1/devices') return json(res, 200, aggregatedDevices());
 
   if (req.method === 'GET' && pathname === '/api/v1/connections') {
-    return json(res, 200, await getConnections());
+    const localConns = await getConnections();
+    const remote = [];
+    for (const a of remoteAgents.values()) {
+      if (removedAgents.has(a.info.agent_id)) continue;
+      for (const c of (a.connections || [])) remote.push({ ...c, fromHost: c.fromHost || a.info.agent_hostname });
+    }
+    return json(res, 200, [...localConns, ...remote].slice(0, 120));
   }
 
   if (req.method === 'GET' && pathname === '/api/v1/traffic') {
@@ -1062,6 +1139,7 @@ if (AGENT_MODE) {
   setInterval(sampleTraffic, 2000);
 } else {
   // ── MODALITÀ SERVER: collector + API + scanner locale embedded ──
+  server.on('upgrade', handleWsUpgrade);   // terminale TCP reale via WebSocket
   server.listen(PORT, () => {
     console.log(`🛰️  NetworkScope server su http://localhost:${PORT}  (agente locale ${AGENT_ID})`);
     startupLog();

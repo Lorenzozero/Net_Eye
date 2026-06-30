@@ -8,7 +8,7 @@ import { getConnection } from '@/lib/connect';
 import TerminalModal from '@/components/TerminalModal';
 import { Server, Terminal, ExternalLink, Plug } from 'lucide-react';
 
-type Term = { title: string; command: string; lines: string[] };
+type Term = { ip: string; port: number; title: string; hint: string };
 
 const riskCls = (level: string) =>
     level === 'alto' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -33,10 +33,10 @@ export default function DeviceDetailModal({ device, onClose }: { device: Device;
         finally { setTimeout(() => setScanning(false), 2000); }
     };
 
-    const connect = (port: number, banner?: string) => {
-        const info = getConnection(device.ip_address, port, serviceName(port), banner);
+    const connect = (port: number) => {
+        const info = getConnection(device.ip_address, port);
         if (info.kind === 'web') window.open(info.url, '_blank', 'noopener');
-        else setTerm({ title: info.title, command: info.command, lines: info.lines });
+        else setTerm({ ip: device.ip_address, port, title: `${serviceName(port)} · ${device.ip_address}:${port}`, hint: info.hint });
     };
 
     return (
@@ -93,15 +93,15 @@ export default function DeviceDetailModal({ device, onClose }: { device: Device;
                             <div className="space-y-1">
                                 {device.open_ports.map((port) => {
                                     const banner = device.banners?.[String(port)];
-                                    const info = getConnection(device.ip_address, port, serviceName(port), banner);
+                                    const info = getConnection(device.ip_address, port);
                                     return (
                                         <div key={port} className="flex items-center gap-2 text-sm">
                                             <span className="inline-flex items-center justify-center min-w-[3.5rem] px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-mono text-xs">{port}</span>
                                             <span className="font-medium text-gray-700 dark:text-gray-300">{serviceName(port)}</span>
                                             {banner && <span className="text-xs text-gray-400 font-mono truncate flex-1" title={banner}>· {banner}</span>}
                                             <button
-                                                onClick={() => connect(port, banner)}
-                                                title={info.kind === 'web' ? info.url : info.command}
+                                                onClick={() => connect(port)}
+                                                title={info.kind === 'web' ? info.url : info.hint}
                                                 className="ml-auto shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-600 hover:text-white transition-colors"
                                             >
                                                 {info.kind === 'web' ? <ExternalLink className="w-3 h-3" /> : <Plug className="w-3 h-3" />}
@@ -134,7 +134,7 @@ export default function DeviceDetailModal({ device, onClose }: { device: Device;
                 </div>
             </div>
 
-            {term && <TerminalModal title={term.title} command={term.command} lines={term.lines} onClose={() => setTerm(null)} />}
+            {term && <TerminalModal ip={term.ip} port={term.port} title={term.title} hint={term.hint} onClose={() => setTerm(null)} />}
         </div>
     );
 }

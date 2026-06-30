@@ -82,7 +82,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
 - 🔗 **Analisi flussi/connessioni** — `netstat` mostra le connessioni attive con **protocollo** (HTTPS, DNS, SSH…), **da quale dispositivo** e **verso quale destinazione**, risolta con **reverse DNS + organizzazione** (Cloudflare, Fastly, Anthropic, Google…), in tabella e su **mappa dei flussi cliccabile**.
 - 🖱️ **Dettagli ovunque** — click su qualsiasi dispositivo (inventario, tabelle reti, **nodo della mappa**) apre il dettaglio completo; click su un flusso del traffico apre il dettaglio della connessione.
-- 🔌 **Connessione one-click per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale simulato** con il comando corretto (SSH, RDP, MySQL, VNC, RTSP, SMB…) e copia-comando.
+- 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
 - 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
@@ -171,7 +171,7 @@ Tutte le tecniche sono **attive e reali**, implementate in `server.mjs` con i so
 | **Tabella connessioni attive** | `netstat -ano` (stati ESTABLISHED) | flussi in corso da/verso l'host |
 | **Classificazione protocollo** | mappatura porta→servizio | HTTPS, DNS, SSH, MQTT, RTSP… (TCP/UDP) |
 | **Risoluzione destinazione** | reverse DNS (PTR) + lookup **organizzazione/ISP** (ip-api, cachato) per gli IP senza PTR | *dove* va il traffico (Cloudflare, Fastly, Anthropic, Google…) |
-| **Connessione per porta** | metodo giusto per servizio: URL browser per le porte web, **terminale simulato** con comando (ssh/rdp/mysql/vnc/rtsp/smb…) per le altre | provare/raggiungere il servizio in un click |
+| **Connessione per porta** | URL browser per le porte web; per le altre un **socket TCP reale** via proxy WebSocket (`/api/v1/connect`, RFC6455 implementato senza dipendenze, ristretto agli IP LAN) → terminale interattivo | parlare davvero col servizio (HTTP/Telnet/Redis/SMTP…) in un click |
 
 ### 🛡️ Sicurezza
 | Tecnica | Logica | Output |
@@ -390,7 +390,8 @@ interface Device {
 - [x] 🛰️ Architettura agent ↔ server multi-rete (più agenti, una dashboard)
 - [x] 🤫 Scansione "educata" (ciclo ARP silenzioso + sweep ICMP raro con jitter)
 - [x] 📥 Installer agenti (Windows/Linux/Python) generati e serviti dal server
-- [x] 🔌 Connessione per porta (browser / terminale simulato) + risoluzione org dei flussi
+- [x] 🔌 Connessione per porta REALE (browser / socket TCP via WebSocket) + risoluzione org dei flussi
+- [x] 📡 Flussi/connessioni reali aggregati da tutti gli agenti (incl. agente Python)
 - [x] 🖱️ Dettagli cliccabili ovunque (dispositivi, nodi mappa, flussi traffico)
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi
