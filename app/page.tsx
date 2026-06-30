@@ -145,7 +145,9 @@ export default function Home() {
           <div className="mt-4 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
             <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${activePercentage}%` }}></div>
           </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-right">{activePercentage}% della rete</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-right">
+            {activePercentage}% online · <span className="text-gray-400">{devices.length - activeDevices} offline</span>
+          </p>
         </div>
 
         {/* Networks */}

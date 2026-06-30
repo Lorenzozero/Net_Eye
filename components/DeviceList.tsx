@@ -133,7 +133,7 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                             </div>
                                             <div className="ml-4">
                                                 <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                    {device.hostname || 'Unknown Host'}
+                                                    {device.hostname || device.vendor || device.device_type?.replace('_', ' ') || 'Dispositivo'}
                                                 </div>
                                                 <div className="text-xs text-gray-500 dark:text-gray-400">
                                                     {device.mac_address || 'MAC Sconosciuto'}
