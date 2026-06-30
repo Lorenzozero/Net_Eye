@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Eye, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import NavActions from '@/components/NavActions';
+import NewDeviceWatcher from '@/components/NewDeviceWatcher';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -94,6 +95,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                 </main>
             </div>
+
+            <NewDeviceWatcher />
         </div>
     );
 }

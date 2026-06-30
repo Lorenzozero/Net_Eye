@@ -20,8 +20,11 @@ export default function ImpostazioniPage() {
         setNotifications((prev) => {
             const next = !prev;
             try { localStorage.setItem('ns:notifications', String(next)); } catch { }
-            setToast({ msg: next ? 'Notifiche attivate' : 'Notifiche disattivate', type: 'success' });
-            setTimeout(() => setToast(null), 2000);
+            if (next && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => { });
+            }
+            setToast({ msg: next ? 'Notifiche attivate (avvisi sui nuovi dispositivi)' : 'Notifiche disattivate', type: 'success' });
+            setTimeout(() => setToast(null), 2500);
             return next;
         });
     };

@@ -36,6 +36,7 @@
 - [🧪 Come testare dalla GUI web](#-come-testare-dalla-gui-web)
 - [🐳 Avvio con Docker](#-avvio-con-docker)
 - [🔌 Backend & API](#-backend--api)
+- [🔐 Sicurezza & note di produzione](#-sicurezza--note-di-produzione)
 - [🗺️ Roadmap](#️-roadmap)
 - [📜 Licenza](#-licenza)
 
@@ -85,6 +86,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
+- 🔔 **Notifiche nuovi dispositivi** — avviso in-app + notifica del browser quando compare un nuovo dispositivo (attivabile da Impostazioni, salvataggio automatico).
 - 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
 - ⚡ **Scansione incrementale + persistenza** — cicli ~3× più veloci (arricchimento solo per device nuovi/stale), **storico** dispositivi salvato su disco e ripristinato al riavvio; **autostart** dello scanner al login senza admin.
 - 🏷️ **Vendor 100% offline** — database **OUI IEEE completo** (~40k vendor) via `npm run oui`: niente più "Unknown" anche senza internet.
@@ -376,6 +378,30 @@ interface Device {
 
 ---
 
+## 🔐 Sicurezza & note di produzione
+
+NetworkScope è pensato come **strumento di monitoraggio della propria rete locale**. Scansiona solo reti che possiedi o per cui hai autorizzazione.
+
+### ✅ Robustezza già implementata
+- **Nessun crash per errori imprevisti**: handler globali `uncaughtException` / `unhandledRejection`, ogni richiesta HTTP è in `try/catch` (risponde 500 invece di cadere), l'upgrade WebSocket è protetto.
+- **Timeout ovunque**: ping, port scan, banner/TLS, reverse DNS, lookup org, comandi di sistema — niente operazioni che possono restare appese.
+- **Best-effort**: vendor/DNS/UPnP/org falliscono in silenzio senza interrompere la scansione; cache su disco per vendor e stato.
+- **Scansione "educata"**: ciclo ARP silenzioso + sweep ICMP raro con jitter → poco rumore in rete.
+
+### ⚠️ Cosa indurire PRIMA di un uso oltre la LAN fidata
+| Aspetto | Stato attuale | Mitigazione consigliata |
+|---|---|---|
+| **Autenticazione** | nessuna: API e proxy aperti a chi raggiunge la porta 8000 | aggiungere un **token condiviso** su API, report agenti e WebSocket |
+| **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918), senza auth | tenere il server su rete fidata; aggiungere auth/allowlist host |
+| **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN |
+| **Trasporto** | HTTP/WS in chiaro | mettere dietro reverse proxy con **HTTPS/WSS** |
+| **Lookup organizzazione** | invia gli **IP di destinazione pubblici** a `ip-api.com` | disattivabile per restare 100% offline (vedi `lookupOrg` in `server.mjs`) |
+| **PATCH dispositivi** | nessuna validazione forte del body | validare/limitare i campi modificabili |
+
+> In sintesi: ottimo come tool personale/di laboratorio sulla **tua** rete. Per un deployment condiviso o esposto, aggiungi **autenticazione, HTTPS/WSS e una allowlist** come sopra.
+
+---
+
 ## 🗺️ Roadmap
 
 - [x] 🛰️ **Backend di scansione reale** (`server.mjs`) — ping-sweep, ARP, reverse DNS, OUI, port scan
@@ -392,6 +418,9 @@ interface Device {
 - [x] 📥 Installer agenti (Windows/Linux/Python) generati e serviti dal server
 - [x] 🔌 Connessione per porta REALE (browser / socket TCP via WebSocket) + risoluzione org dei flussi
 - [x] 📡 Flussi/connessioni reali aggregati da tutti gli agenti (incl. agente Python)
+- [x] 🖥️ Terminale reale con colori ANSI e input carattere-per-carattere (interattivo)
+- [x] 🔔 Notifiche nuovi dispositivi (in-app + browser)
+- [x] 🛡️ Resilienza: handler globali, request `try/catch`, timeout ovunque
 - [x] 🖱️ Dettagli cliccabili ovunque (dispositivi, nodi mappa, flussi traffico)
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi

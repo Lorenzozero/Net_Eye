@@ -80,6 +80,7 @@ function wsDecode(buf) {
 
 // Gestisce un upgrade WebSocket → apre un socket TCP reale verso ip:port e fa da ponte bidirezionale.
 function handleWsUpgrade(req, socket) {
+  try {
   const { pathname, searchParams } = new URL(req.url, 'http://localhost');
   if (pathname !== '/api/v1/connect') { socket.destroy(); return; }
   const ip = searchParams.get('ip');
@@ -112,6 +113,10 @@ function handleWsUpgrade(req, socket) {
   });
   socket.on('error', () => { try { target.destroy(); } catch {} });
   socket.on('close', () => { try { target.destroy(); } catch {} });
+  } catch (e) {
+    console.error('Errore WS upgrade:', e?.message);
+    try { socket.destroy(); } catch { /* ignore */ }
+  }
 }
 
 // POST JSON minimale (per la comunicazione agent → server)
@@ -885,6 +890,10 @@ async function getConnections() {
 const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
 const startedAt = Date.now();
 
+// Resilienza: un errore imprevisto non deve far cadere il monitoraggio.
+process.on('uncaughtException', (e) => console.error('⚠️  uncaughtException:', e?.stack || e));
+process.on('unhandledRejection', (e) => console.error('⚠️  unhandledRejection:', e?.stack || e));
+
 function localAgentDescriptor() {
   return {
     agent_id: AGENT_ID, agent_ip: local.ip || '127.0.0.1', agent_hostname: os.hostname(),
@@ -991,6 +1000,7 @@ const server = createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.end();
 
+  try {
   const { pathname } = new URL(req.url, `http://localhost:${PORT}`);
   const parts = pathname.split('/').filter(Boolean);
 
@@ -1109,6 +1119,10 @@ const server = createServer(async (req, res) => {
   }
 
   json(res, 404, { error: 'rotta non gestita' });
+  } catch (err) {
+    console.error('Errore richiesta', req.url, err?.message);
+    try { if (!res.headersSent) json(res, 500, { error: 'errore interno' }); } catch { /* ignore */ }
+  }
 });
 
 function startupLog() {
