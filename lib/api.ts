@@ -144,6 +144,27 @@ export async function fetchCapabilities(): Promise<Capabilities> {
     return res.json();
 }
 
+export interface PacketFlow {
+    remoteIp: string;
+    remotePort: number;
+    remoteHost: string | null;
+    proto: string;
+    packets: number;
+    bytes: number;
+    service: string;
+    inspected: boolean;      // riconosciuto dal payload reale
+    threat: string | null;
+    payloadHex: string | null; // primi byte del payload (esadecimale)
+    payloadLen: number;
+    at: number;
+}
+
+export async function fetchFlows(): Promise<{ active: boolean; reason: string; packets: number; flows: PacketFlow[] }> {
+    const res = await apiFetch('/api/v1/flows');
+    if (!res.ok) throw new Error('Impossibile recuperare i flussi catturati');
+    return res.json();
+}
+
 export async function fetchConnections(): Promise<Connection[]> {
     const res = await apiFetch('/api/v1/connections');
     if (!res.ok) throw new Error('Impossibile recuperare le connessioni');

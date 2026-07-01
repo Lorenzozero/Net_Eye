@@ -8,6 +8,7 @@ import { fetchTraffic, fetchConnections, TrafficData, TrafficPoint, Connection }
 import ConnectionModal from '@/components/ConnectionModal';
 import TopTalkers from '@/components/TopTalkers';
 import CapabilitiesPanel from '@/components/CapabilitiesPanel';
+import PacketFlowsTable from '@/components/PacketFlowsTable';
 import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe, GitFork, Info } from 'lucide-react';
 
 const TopFlowsGraph = dynamic(() => import('@/components/TopFlowsGraph'), { ssr: false });
@@ -222,6 +223,9 @@ export default function TrafficoPage() {
                     <TopFlowsGraph connections={connections} onSelect={setSelConn} />
                 </div>
             </div>
+
+            {/* Analisi pacchetti — flussi catturati dal vivo */}
+            <PacketFlowsTable />
 
             {/* Mappa geografica dei flussi */}
             <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">

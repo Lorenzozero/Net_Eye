@@ -57,14 +57,17 @@ export default function NotificationsBell() {
                         <div className="overflow-y-auto">
                             {items.length === 0 ? (
                                 <p className="p-8 text-center text-sm text-gray-400">Nessuna notifica</p>
-                            ) : items.map((n) => (
-                                <div key={n.id} className="p-3 border-b border-slate-100 dark:border-white/5 last:border-0">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{n.title}</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                        <span className="font-mono">{n.detail}</span> · {new Date(n.time).toLocaleString('it-IT')}
+                            ) : items.map((n) => {
+                                const bar = n.level === 'danger' ? 'border-l-red-500' : n.level === 'warning' ? 'border-l-amber-500' : 'border-l-indigo-500';
+                                return (
+                                    <div key={n.id} className={`p-3 pl-2.5 border-b border-slate-100 dark:border-white/5 last:border-0 border-l-4 ${bar}`}>
+                                        <div className="text-sm font-medium text-gray-900 dark:text-white">{n.title}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                            <span className="font-mono">{n.detail}</span> · {new Date(n.time).toLocaleString('it-IT')}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </>

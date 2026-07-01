@@ -19,7 +19,7 @@ import { checkToken, tokenFromRequest, createTicketStore } from './lib/server/au
 import { ttlOs, isRandomMac, isPrivateIp, parseArpTable, ouiVendor as ouiVendorLookup } from './lib/server/netparse.mjs';
 import { initGeo, lookupGeo, geoStatus } from './lib/server/geo.mjs';
 import { classifyFlow, dpiStatus } from './lib/server/dpi.mjs';
-import { startCapture, flowBytesFor, pcapStatus } from './lib/server/pcap.mjs';
+import { startCapture, flowBytesFor, getFlows, pcapStatus } from './lib/server/pcap.mjs';
 
 const PORT = 8000;
 const isWin = process.platform === 'win32';
@@ -321,6 +321,7 @@ function publishDevices() {
   devices = [...registry.values()].sort((a, b) => ipKey(a.ip_address).localeCompare(ipKey(b.ip_address)));
   devices.forEach((d, i) => (d.id = i + 1));
 }
+const alertedThreats = new Set(); // dedup notifiche minacce (mal:<ip> / port:<ip>:<port>)
 const vendorCache = loadCache();
 const vendorQueue = [];
 let queueRunning = false;
@@ -962,7 +963,13 @@ async function runVtQueue() {
     if (vtCache.has(ip)) continue;
     const stats = await vtLookup(ip);
     vtCache.set(ip, stats);
-    if (stats && stats.malicious > 0) console.log(`🚨 VirusTotal: ${ip} segnalato MALEVOLO da ${stats.malicious} motori`);
+    if (stats && stats.malicious > 0) {
+      console.log(`🚨 VirusTotal: ${ip} segnalato MALEVOLO da ${stats.malicious} motori`);
+      if (!alertedThreats.has(`mal:${ip}`)) {
+        alertedThreats.add(`mal:${ip}`);
+        broadcastEvent({ type: 'threat', kind: 'malicious', ts: Date.now(), ip, engines: stats.malicious, host: dnsCache.get(ip) || null });
+      }
+    }
     await new Promise((r) => setTimeout(r, 16000)); // free tier ~4 richieste/min
   }
   vtRunning = false;
@@ -1027,6 +1034,14 @@ async function getConnections() {
     e.vt = vt || null;
     // Tutte queste connessioni originano da QUESTA macchina (lo scanner/agente).
     e.fromHost = os.hostname();
+    // Push in tempo reale per una connessione verso una porta trojan/worm nota (una volta per ip:porta).
+    if (e.threat) {
+      const tk = `port:${e.remoteIp}:${e.remotePort}`;
+      if (!alertedThreats.has(tk)) {
+        alertedThreats.add(tk);
+        broadcastEvent({ type: 'threat', kind: 'port', ts: Date.now(), ip: e.remoteIp, port: e.remotePort, host: e.remoteHost, service: e.service, threat: e.threat, process: e.process || null });
+      }
+    }
   }
   // Ordina: prima le connessioni sospette/malevole, poi per conteggio
   list.sort((a, b) => (b.malicious - a.malicious) || ((b.threat ? 1 : 0) - (a.threat ? 1 : 0)) || (b.count - a.count));
@@ -1178,6 +1193,27 @@ const server = createServer(async (req, res) => {
   // Capacità avanzate del backend (per le evidenze in frontend): cattura pacchetti, DPI, geo.
   if (req.method === 'GET' && pathname === '/api/v1/capabilities') {
     return json(res, 200, { pcap: pcapStatus(), dpi: dpiStatus(), geo: geoStatus(), offline: OFFLINE });
+  }
+
+  // Flussi catturati dal vivo (cattura pacchetti reale) con anteprima del payload — vista "Wireshark-lite".
+  if (req.method === 'GET' && pathname === '/api/v1/flows') {
+    const st = pcapStatus();
+    const flows = getFlows()
+      .sort((a, b) => b.bytes - a.bytes)
+      .slice(0, 80)
+      .map((f) => {
+        const dpi = classifyFlow({ port: f.remotePort, proto: f.proto, payload: f.sample });
+        return {
+          remoteIp: f.remoteIp, remotePort: f.remotePort, remoteHost: dnsCache.get(f.remoteIp) || null,
+          proto: f.proto, packets: f.packets, bytes: f.bytes,
+          service: dpi.service, inspected: dpi.inspected,
+          threat: dpi.threat ? `${dpi.threat.name} (${dpi.threat.kind})` : null,
+          payloadHex: f.sample ? f.sample.toString('hex') : null,
+          payloadLen: f.sample ? f.sample.length : 0,
+          at: f.at,
+        };
+      });
+    return json(res, 200, { active: st.active, reason: st.reason, packets: st.packets, flows });
   }
 
   // Configurazione runtime (chiave VirusTotal) — impostabile dalle Impostazioni

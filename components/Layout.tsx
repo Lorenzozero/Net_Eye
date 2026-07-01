@@ -5,8 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Eye, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import NavActions from '@/components/NavActions';
-import NewDeviceWatcher from '@/components/NewDeviceWatcher';
-import ThreatWatcher from '@/components/ThreatWatcher';
+import EventWatcher from '@/components/EventWatcher';
 import NotificationsBell from '@/components/NotificationsBell';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -99,8 +98,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </main>
             </div>
 
-            <NewDeviceWatcher />
-            <ThreatWatcher />
+            <EventWatcher />
         </div>
     );
 }
