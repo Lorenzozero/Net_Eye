@@ -16,7 +16,9 @@
     "autostart:uninstall": "node scripts/uninstall-autostart.mjs"
   },
   "dependencies": {
+    "cap": "^0.2.1",
     "lucide-react": "^0.556.0",
+    "maxmind": "^5.0.6",
     "next": "16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",

@@ -1,10 +1,20 @@
 FROM node:20-alpine
 
-# Strumenti di rete usati dallo scanner (ping, arp, netstat)
-RUN apk add --no-cache iputils net-tools iproute2
+# Strumenti di rete usati dallo scanner (ping, arp, netstat) + runtime libpcap per la cattura pacchetti
+RUN apk add --no-cache iputils net-tools iproute2 libpcap
 
 WORKDIR /app
+
+# Dipendenze native del backend: `cap` (binding libpcap) e `maxmind` (reader GeoLite2).
+# I tool di build (build-base, libpcap-dev, python3, linux-headers) servono solo a compilare
+# `cap` e vengono rimossi subito dopo per tenere l'immagine leggera.
+RUN apk add --no-cache --virtual .build build-base libpcap-dev linux-headers python3 \
+ && npm install --no-save --no-package-lock cap@^0.2.1 maxmind@^5.0.6 \
+ && apk del .build
+
 COPY server.mjs mock-api.mjs ./
+COPY lib ./lib
+COPY data ./data
 COPY agent ./agent
 # oui-db.json opzionale: montalo o genera con "npm run oui" e copialo qui
 

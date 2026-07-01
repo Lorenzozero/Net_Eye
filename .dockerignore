@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+*.log
+backend.log
+state.json
+.agent-id
+.ns-config.json
+.vendor-cache.json
+data/*.mmdb
+data/*.csv
+coverage

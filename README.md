@@ -385,22 +385,24 @@ interface Device {
 
 ---
 
-## 🧩 Capacità avanzate (opzionali)
+## 🧩 Capacità avanzate
 
 Il backend è organizzato in **moduli** (`lib/server/`) — `auth.mjs` (token + ticket WS), `netparse.mjs` (TTL/MAC/ARP/OUI), `dpi.mjs` (protocolli + minacce), `geo.mjs` (MaxMind + ip-api), `pcap.mjs` (cattura pacchetti). Le funzioni pure sono coperte da **test** (`npm test`). Ogni capacità funziona in modo **best-effort e degrada con eleganza**: la pagina **Traffico** mostra un pannello "Motore di analisi — evidenze" con lo stato reale di ciascun motore.
+
+**`cap` (cattura pacchetti) e `maxmind` (geo) sono ora dipendenze del progetto**: `npm install` le installa e le compila (il native `cap` richiede build tools + header libpcap, vedi sotto). Il `Dockerfile.backend` le installa già nell'immagine.
 
 ### 📡 Cattura pacchetti reale (Npcap / libpcap)
 Per vedere i **byte effettivi per flusso** (non solo la socket table) e fare deep inspection sui payload:
 
-1. **Windows**: installa **[Npcap](https://npcap.com/)** (spunta *WinPcap API-compatible*). **Linux/macOS**: `libpcap` (spesso già presente; `apt install libpcap-dev` se serve compilare).
-2. Installa il binding nativo: `npm i cap`
-3. Avvia il backend **con privilegi** (Amministratore / `sudo`) — la cattura live richiede accesso raw all'interfaccia.
+- **Windows**: installa **[Npcap](https://npcap.com/)** e — importante — spunta **"Install Npcap in WinPcap API-compatible Mode"**. Per la cattura live avvia il backend **come Amministratore** (`node server.mjs` da un PowerShell elevato): con l'opzione di default "restrict to Administrators", un processo non-admin apre l'interfaccia ma **non riceve pacchetti**.
+- **Linux/macOS**: serve **libpcap** (build: `apt install libpcap-dev`) e privilegi raw — avvia con `sudo` **oppure** concedi la capability: `sudo setcap cap_net_raw,cap_net_admin=eip $(which node)`.
+- **Docker** (Linux): già configurato — `Dockerfile.backend` installa `libpcap`, il `docker-compose.yml` aggiunge `cap_add: [NET_RAW, NET_ADMIN]` + `network_mode: host`. `docker compose up --build` e la cattura è attiva.
 
 Senza questi requisiti l'app resta in **modalità socket-table** (il pannello evidenze lo indica). È l'unica capacità che richiede privilegi: tutto il resto gira senza admin.
 
 ### 🗺️ Geolocalizzazione MaxMind (più affidabile di ip-api)
 1. Crea un account gratuito **[MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)** e scarica `GeoLite2-City.mmdb` (opzionale: `GeoLite2-ASN.mmdb`).
-2. Mettili in `data/` e installa il reader: `npm i maxmind`
+2. Mettili in `data/`. Il reader `maxmind` è già una dipendenza del progetto (installato da `npm install`).
 3. Riavvia: il provider passa automaticamente a **MaxMind** (nessun IP inviato a terzi). Senza DB, fallback a **ip-api** con backoff.
 
 ### 🔬 Deep Packet Inspection

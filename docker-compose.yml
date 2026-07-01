@@ -8,6 +8,10 @@
 # raggiungibile in host mode: usa in quel caso "npm run backend" nativo,
 # oppure il mock ("npm run mock") per la demo.
 #
+# Cattura pacchetti reale (libpcap): richiede host network + le capability
+# NET_RAW/NET_ADMIN (già impostate sotto). Su Linux funziona out-of-the-box;
+# senza queste il backend resta in modalità socket-table.
+#
 # Autenticazione opzionale: esporta NS_TOKEN prima di avviare per proteggere
 # API/WebSocket/agenti (frontend e backend ricevono lo stesso token).
 
@@ -18,8 +22,13 @@ services:
       dockerfile: Dockerfile.backend
     network_mode: host
     restart: unless-stopped
+    # Necessarie alla cattura pacchetti reale (libpcap) dentro al container
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     environment:
       - NS_TOKEN=${NS_TOKEN:-}
+      # NS_OFFLINE=1 per disattivare le chiamate a servizi terzi (ip-api/VirusTotal)
 
   frontend:
     build:

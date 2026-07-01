@@ -1325,7 +1325,7 @@ function initCapabilities() {
   if (OFFLINE) return;
   const localIps = new Set();
   try { for (const list of Object.values(os.networkInterfaces())) for (const ni of (list || [])) if (ni.family === 'IPv4') localIps.add(ni.address); } catch {}
-  const s = startCapture({ localIps });
+  const s = startCapture({ localIps, deviceIp: local.ip });
   console.log(s.active ? `   📡 cattura pacchetti REALE attiva su ${s.device}` : `   📡 cattura pacchetti non attiva: ${s.reason} (modalità socket-table)`);
   const d = dpiStatus();
   console.log(`   🔬 DPI: ${d.services} servizi, ${d.threats} minacce note${d.ianaLoaded ? ' (IANA)' : ''}`);
