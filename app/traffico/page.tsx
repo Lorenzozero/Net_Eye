@@ -16,6 +16,10 @@ const ConnectionsMap = dynamic(() => import('@/components/ConnectionsMap'), {
     ssr: false,
     loading: () => <div className="h-full flex items-center justify-center text-sm text-gray-400">Caricamento mappa…</div>,
 });
+const FlowsGeoMap = dynamic(() => import('@/components/FlowsGeoMap'), {
+    ssr: false,
+    loading: () => <div className="h-full flex items-center justify-center text-sm text-gray-400">Caricamento mappa geografica…</div>,
+});
 
 const flagEmoji = (cc?: string | null) =>
     cc && cc.length === 2 ? cc.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0))) : '';
@@ -176,6 +180,17 @@ export default function TrafficoPage() {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            {/* Mappa geografica dei flussi */}
+            <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
+                    <Globe className="w-5 h-5 mr-2 text-indigo-500" /> Mappa geografica dei flussi
+                </h3>
+                <p className="text-xs text-gray-400 mb-3">Dove si trovano nel mondo le destinazioni del tuo traffico (paese, città, coordinate). Click su un punto per i dettagli.</p>
+                <div className="h-[360px]">
+                    <FlowsGeoMap connections={connections} onSelect={setSelConn} />
                 </div>
             </div>
 

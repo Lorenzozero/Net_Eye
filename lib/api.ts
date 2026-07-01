@@ -87,6 +87,8 @@ export interface Connection {
     country?: string | null;
     countryCode?: string | null;
     city?: string | null;
+    lat?: number | null;
+    lon?: number | null;
     process?: string | null;
     threat?: string | null;
     malicious?: number;

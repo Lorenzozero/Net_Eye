@@ -103,7 +103,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 | `/` | 🏠 **Dashboard** | Hub: KPI, topologia compatta, traffico, azioni rapide |
 | `/dispositivi` | 📇 **Dispositivi** | Inventario completo con ricerca e dettagli di sicurezza |
 | `/mappa` | 🗺️ **Mappa** | Topologia a schermo intero, interattiva |
-| `/traffico` | 📈 **Traffico** | Throughput e **pacchetti/s in tempo reale**, totali + **mappa dei flussi/connessioni attive** |
+| `/traffico` | 📈 **Traffico** | Throughput e **pacchetti/s in tempo reale**, totali, **mappa dei flussi** + **mappa geografica** (paese/città), connessioni con programma/ASN/VirusTotal |
 | `/impostazioni` | ⚙️ **Impostazioni** | Agent, download installer, tema, notifiche |
 
 ---
@@ -298,39 +298,6 @@ npm run mock          # Terminale 1 (porta 8000)
 npm run dev           # Terminale 2 (porta 3000)
 ```
 
-### ✅ Checklist di collaudo (vale per 🅰️ e 🅱️)
-
-Apri **http://localhost:3000** e verifica:
-
-| ✅ | Pagina | Cosa verificare |
-|---|---|---|
-| ☐ | 🏠 **Dashboard** (`/`) | Le 4 card mostrano i numeri della tua rete (dispositivi, online, reti, avvisi) |
-| ☐ | 🏠 Dashboard | Il grafico **Traffico** si disegna (area blu/viola) |
-| ☐ | 🗺️ **Topologia** | Vedi il **gateway/router** al centro con gli altri nodi in orbita |
-| ☐ | 🗺️ Topologia | **Trascini** un nodo, **zoom** con la rotella, **click** apre il pannello dettagli |
-| ☐ | 🔍 **Scansione** | Il pulsante "Avvia Scansione" cambia stato e torna "Pronto" dopo qualche secondo |
-| ☐ | 📇 **Dispositivi** (`/dispositivi`) | Tabella popolata; la **ricerca** filtra per IP/hostname/vendor |
-| ☐ | 📇 Dispositivi | Click su una riga → **modale** con MAC, vendor, porte aperte |
-| ☐ | 🧩 Dashboard | In "Dettaglio Reti" puoi **rinominare** un hostname (matita → salva) |
-| ☐ | ⚙️ **Impostazioni** (`/impostazioni`) | Tabella **Agent**: in modalità reale compare lo **scanner locale** (questo PC) come agente online |
-| ☐ | 🌙 **Tema** | Il toggle 🌙/☀️ cambia tema e **resta** dopo un refresh |
-| ☐ | 📱 **Responsive** | Riduci la finestra: la UI si adatta (DevTools → modalità mobile) |
-| ☐ | 🧰 **Console** | DevTools (F12) → **nessun errore rosso** in console |
-
-### 🅲️ Solo UI, senza alcun backend
-
-```bash
-npm run dev
-```
-
-L'app parte comunque: vedrai **stati vuoti/zero** (nessun dispositivo). In console comparirà un errore di `fetch` verso `:8000` — è **atteso** e dimostra che il data layer tenta correttamente la connessione. Utile per testare layout, navigazione, tema e responsività.
-
-> 💡 **Health check da terminale** (con backend reale o mock attivo):
-> ```bash
-> curl http://localhost:8000/api/v1/devices   # → JSON con i dispositivi rilevati
-> curl http://localhost:3000                   # → HTML 200 della dashboard
-> ```
-
 ---
 
 ## 🐳 Avvio con Docker
@@ -448,6 +415,7 @@ NS_TOKEN=un-segreto-forte npm run agent -- --agent http://SERVER:8000
 - [x] 🧪 Test automatici con Vitest (`npm test`)
 - [x] 🐳 `docker-compose` frontend + backend con un comando
 - [x] 🌍 Flussi arricchiti: geolocalizzazione + ASN + **programma sorgente** (tasklist)
+- [x] 🗺️ **Mappa geografica dei flussi** (paese/città/coordinate su proiezione equirettangolare)
 - [x] 🛑 Integrazione **VirusTotal** (IP malevoli) + notifica automatica
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🧪 Test end-to-end (Playwright)

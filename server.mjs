@@ -879,7 +879,7 @@ async function reverseDnsT(ip) {
 function lookupIpInfo(ip) {
   return new Promise((resolve) => {
     try {
-      const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as,country,countryCode,city`, { timeout: 2000 }, (res) => {
+      const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as,country,countryCode,city,lat,lon`, { timeout: 2000 }, (res) => {
         let b = '';
         res.on('data', (c) => (b += c));
         res.on('end', () => {
@@ -891,6 +891,7 @@ function lookupIpInfo(ip) {
               org: j.org || j.isp || (asMatch ? asMatch[2] : null) || null,
               asn: asMatch ? `AS${asMatch[1]}` : null,
               country: j.country || null, countryCode: j.countryCode || null, city: j.city || null,
+              lat: typeof j.lat === 'number' ? j.lat : null, lon: typeof j.lon === 'number' ? j.lon : null,
             });
           } catch { resolve(null); }
         });
@@ -998,6 +999,8 @@ async function getConnections() {
     e.country = info?.country || null;
     e.countryCode = info?.countryCode || null;
     e.city = info?.city || null;
+    e.lat = info?.lat ?? null;
+    e.lon = info?.lon ?? null;
     e.threat = THREAT_PORTS[e.remotePort] || null;
     const vt = e.scope === 'Internet' ? checkVT(e.remoteIp) : null;
     e.malicious = vt?.malicious || 0;
