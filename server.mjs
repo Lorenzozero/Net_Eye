@@ -29,6 +29,15 @@ const _ai = _args.indexOf('--agent');
 const AGENT_TARGET = _ai >= 0 ? _args[_ai + 1] : (process.env.NS_AGENT_TARGET || null);
 const AGENT_MODE = !!AGENT_TARGET;
 
+// Autenticazione opzionale: se NS_TOKEN è impostato, API/WebSocket/agenti richiedono il token.
+// Non impostato = aperto (comodo in locale). Header "x-ns-token" oppure query "?token=".
+const TOKEN = process.env.NS_TOKEN || null;
+function authOk(req) {
+  if (!TOKEN) return true;
+  const t = req.headers['x-ns-token'] || new URL(req.url, 'http://x').searchParams.get('token');
+  return t === TOKEN;
+}
+
 // Identità agente persistente (stabile fra i riavvii). Override per test/multi-istanza con NS_AGENT_ID.
 const AGENT_ID_FILE = new URL('./.agent-id', import.meta.url);
 const AGENT_ID = process.env.NS_AGENT_ID || (() => {
@@ -100,6 +109,7 @@ function handleWsUpgrade(req, socket) {
   try {
   const { pathname, searchParams } = new URL(req.url, 'http://localhost');
   if (pathname !== '/api/v1/connect') { socket.destroy(); return; }
+  if (TOKEN && searchParams.get('token') !== TOKEN) { socket.destroy(); return; }
   const ip = searchParams.get('ip');
   const port = Number(searchParams.get('port'));
   const key = req.headers['sec-websocket-key'];
@@ -150,7 +160,9 @@ function postJson(url, obj) {
       const u = new URL(url);
       const data = JSON.stringify(obj);
       const lib = u.protocol === 'https:' ? https : http;
-      const req = lib.request(u, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }, timeout: 8000 }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
+      if (TOKEN) headers['x-ns-token'] = TOKEN;
+      const req = lib.request(u, { method: 'POST', headers, timeout: 8000 }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
       req.on('error', () => resolve(null));
       req.on('timeout', () => { req.destroy(); resolve(null); });
       req.write(data); req.end();
@@ -1028,8 +1040,11 @@ const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, `http://localhost:${PORT}`);
   const parts = pathname.split('/').filter(Boolean);
 
-  // Download installer/agent (i pulsanti "Scarica Installer")
+  // Download installer/agent (i pulsanti "Scarica Installer") — aperto anche con auth attiva
   if (req.method === 'GET' && parts[0] === 'static' && parts[1]) return serveInstaller(req, res, parts[1]);
+
+  // Autenticazione (se NS_TOKEN è impostato) su tutte le rotte /api
+  if (pathname.startsWith('/api/') && !authOk(req)) return json(res, 401, { error: 'non autorizzato (token mancante o errato)' });
 
   if (req.method === 'GET' && pathname === '/api/v1/devices') return json(res, 200, aggregatedDevices());
 

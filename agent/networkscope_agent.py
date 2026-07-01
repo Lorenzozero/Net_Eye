@@ -13,6 +13,7 @@ import sys, os, json, socket, subprocess, platform, time, re, uuid, urllib.reque
 from concurrent.futures import ThreadPoolExecutor
 
 SERVER = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("NS_SERVER", "http://localhost:8000")).rstrip("/")
+TOKEN = os.environ.get("NS_TOKEN")  # se il server richiede autenticazione
 IS_WIN = platform.system() == "Windows"
 PORTS = [22, 23, 53, 80, 139, 443, 445, 3389, 8080, 62078]  # fingerprint leggero
 FULL_INTERVAL = 180  # secondi tra le scansioni complete (educato)
@@ -184,9 +185,10 @@ def connections():
 
 def post(path, obj):
     try:
-        req = urllib.request.Request(
-            SERVER + path, data=json.dumps(obj).encode(),
-            headers={"Content-Type": "application/json"}, method="POST")
+        headers = {"Content-Type": "application/json"}
+        if TOKEN:
+            headers["x-ns-token"] = TOKEN
+        req = urllib.request.Request(SERVER + path, data=json.dumps(obj).encode(), headers=headers, method="POST")
         urllib.request.urlopen(req, timeout=8).read()
         return True
     except Exception:

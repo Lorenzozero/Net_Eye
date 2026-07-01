@@ -6,6 +6,7 @@ import { Eye, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import NavActions from '@/components/NavActions';
 import NewDeviceWatcher from '@/components/NewDeviceWatcher';
+import NotificationsBell from '@/components/NotificationsBell';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -51,6 +52,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         </div>
                         <div className="flex items-center gap-2">
                             <NavActions />
+                            <NotificationsBell />
                             <button
                                 onClick={toggleTheme}
                                 className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { API_URL } from '@/lib/api';
+import { API_URL, WS_TOKEN_QS } from '@/lib/api';
 import { X, Copy, Check } from 'lucide-react';
 
 // Parser ANSI minimale (SGR): colora l'output del terminale.
@@ -43,7 +43,7 @@ export default function TerminalModal({ ip, port, title, hint, onClose }: { ip: 
 
     useEffect(() => {
         const wsBase = API_URL.replace(/^http/, 'ws');
-        const ws = new WebSocket(`${wsBase}/api/v1/connect?ip=${encodeURIComponent(String(ip))}&port=${port}`);
+        const ws = new WebSocket(`${wsBase}/api/v1/connect?ip=${encodeURIComponent(String(ip))}&port=${port}${WS_TOKEN_QS}`);
         ws.binaryType = 'arraybuffer';
         wsRef.current = ws;
         ws.onopen = () => { setStatus('open'); bodyRef.current?.focus(); };

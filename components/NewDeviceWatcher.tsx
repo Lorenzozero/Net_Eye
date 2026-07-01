@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchDevices } from '@/lib/api';
+import { addNotification } from '@/lib/notifications';
 import { Device } from '@/types';
 import { Bell, X } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export default function NewDeviceWatcher() {
                     new Notification('NetworkScope', { body: `${msg} — ${body}` });
                 }
             } catch { /* ignore */ }
+            addNotification({ title: msg, detail: body });   // salva in cronologia
             const id = Date.now() + Math.random();
             setToasts((t) => [...t, { id, msg }]);
             setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 7000);

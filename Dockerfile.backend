@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+# Strumenti di rete usati dallo scanner (ping, arp, netstat)
+RUN apk add --no-cache iputils net-tools iproute2
+
+WORKDIR /app
+COPY server.mjs mock-api.mjs ./
+COPY agent ./agent
+# oui-db.json opzionale: montalo o genera con "npm run oui" e copialo qui
+
+EXPOSE 8000
+CMD ["node", "server.mjs"]

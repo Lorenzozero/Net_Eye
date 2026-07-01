@@ -86,7 +86,8 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
-- 🔔 **Notifiche nuovi dispositivi** — avviso in-app + notifica del browser quando compare un nuovo dispositivo (attivabile da Impostazioni, salvataggio automatico).
+- 🔔 **Notifiche nuovi dispositivi + cronologia** — avviso in-app + notifica del browser quando compare un nuovo dispositivo; il **bell in navbar** apre la cronologia con **data e dettagli** e badge dei non letti.
+- 🔐 **Autenticazione a token opzionale** — con `NS_TOKEN` API, WebSocket e report degli agenti richiedono il token; non impostato resta aperto per l'uso locale.
 - 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
 - ⚡ **Scansione incrementale + persistenza** — cicli ~3× più veloci (arricchimento solo per device nuovi/stale), **storico** dispositivi salvato su disco e ripristinato al riavvio; **autostart** dello scanner al login senza admin.
 - 🏷️ **Vendor 100% offline** — database **OUI IEEE completo** (~40k vendor) via `npm run oui`: niente più "Unknown" anche senza internet.
@@ -251,6 +252,8 @@ npm run dev
 | `npm run build` | Build di produzione |
 | `npm start` | Avvia la build di produzione |
 | `npm run lint` | Controllo ESLint |
+| `npm test` | Test automatici (Vitest) |
+| `docker compose up --build` | 🐳 Avvia **frontend + backend** insieme (vedi note in `docker-compose.yml`) |
 
 ---
 
@@ -328,17 +331,21 @@ L'app parte comunque: vedrai **stati vuoti/zero** (nessun dispositivo). In conso
 
 ## 🐳 Avvio con Docker
 
-Il progetto include un `Dockerfile.dev` pronto:
+**Tutto con un comando** ([`docker-compose.yml`](docker-compose.yml)) — frontend + backend:
 
 ```bash
-# Build dell'immagine
-docker build -f Dockerfile.dev -t networkscope:dev .
-
-# Avvio (porta 3000 esposta)
-docker run -it --rm -p 3000:3000 networkscope:dev
+docker compose up --build
+# frontend http://localhost:3000 · backend http://localhost:8000
+# con auth:  NS_TOKEN=un-segreto docker compose up --build
 ```
 
-➡️ Anche qui: **http://localhost:3000**
+> ⚠️ Per scansionare la rete **reale** serve `network_mode: host` (già impostato) e funziona su **Linux**. Su Windows/macOS Docker Desktop la LAN non è raggiungibile in host mode: usa `npm run backend` nativo o il mock. Dettagli nel file compose.
+
+Solo frontend (immagine singola):
+```bash
+docker build -f Dockerfile.dev -t networkscope:dev .
+docker run -it --rm -p 3000:3000 networkscope:dev
+```
 
 ---
 
@@ -391,14 +398,23 @@ NetworkScope è pensato come **strumento di monitoraggio della propria rete loca
 ### ⚠️ Cosa indurire PRIMA di un uso oltre la LAN fidata
 | Aspetto | Stato attuale | Mitigazione consigliata |
 |---|---|---|
-| **Autenticazione** | nessuna: API e proxy aperti a chi raggiunge la porta 8000 | aggiungere un **token condiviso** su API, report agenti e WebSocket |
-| **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918), senza auth | tenere il server su rete fidata; aggiungere auth/allowlist host |
-| **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN |
+| **Autenticazione** | **token opzionale**: imposta `NS_TOKEN` sul server e `NEXT_PUBLIC_NS_TOKEN` sul frontend (stesso valore) → API, WebSocket e report degli agenti richiedono il token (header `x-ns-token` / query `?token=`). Non impostato = aperto (comodo in locale). | attivare `NS_TOKEN` per qualsiasi uso oltre `localhost` |
+| **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918); con `NS_TOKEN` attivo richiede anche il token | tenere il server su rete fidata + token |
+| **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN + token |
 | **Trasporto** | HTTP/WS in chiaro | mettere dietro reverse proxy con **HTTPS/WSS** |
 | **Lookup organizzazione** | invia gli **IP di destinazione pubblici** a `ip-api.com` | disattivabile per restare 100% offline (vedi `lookupOrg` in `server.mjs`) |
-| **PATCH dispositivi** | nessuna validazione forte del body | validare/limitare i campi modificabili |
 
-> In sintesi: ottimo come tool personale/di laboratorio sulla **tua** rete. Per un deployment condiviso o esposto, aggiungi **autenticazione, HTTPS/WSS e una allowlist** come sopra.
+**Esempio con autenticazione:**
+```bash
+# backend
+NS_TOKEN=un-segreto-forte npm run backend
+# frontend
+NEXT_PUBLIC_NS_TOKEN=un-segreto-forte npm run dev
+# agente su un'altra macchina
+NS_TOKEN=un-segreto-forte npm run agent -- --agent http://SERVER:8000
+```
+
+> In sintesi: ottimo come tool personale/di laboratorio sulla **tua** rete. Per un uso condiviso/esposto attiva **`NS_TOKEN`** e metti **HTTPS/WSS** davanti.
 
 ---
 
@@ -422,11 +438,13 @@ NetworkScope è pensato come **strumento di monitoraggio della propria rete loca
 - [x] 🔔 Notifiche nuovi dispositivi (in-app + browser)
 - [x] 🛡️ Resilienza: handler globali, request `try/catch`, timeout ovunque
 - [x] 🖱️ Dettagli cliccabili ovunque (dispositivi, nodi mappa, flussi traffico)
+- [x] 🔔 Cronologia notifiche (bell in navbar, con data e dettagli)
+- [x] 🔐 Autenticazione a token opzionale (API + WebSocket + agenti)
+- [x] 🧪 Test automatici con Vitest (`npm test`)
+- [x] 🐳 `docker-compose` frontend + backend con un comando
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
-- [ ] 🔔 Notifiche real-time (WebSocket) per nuovi dispositivi
-- [ ] 🧪 Test automatici (Vitest + Playwright)
-- [ ] 🔐 Autenticazione e multi-utente
-- [ ] 🐳 `docker-compose` frontend + backend con un comando
+- [ ] 🧪 Test end-to-end (Playwright)
+- [ ] 👥 Multi-utente / ruoli
 
 ---
 
