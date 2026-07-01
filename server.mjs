@@ -78,6 +78,23 @@ function wsDecode(buf) {
   return { opcode, payload, rest: buf.subarray(off + len) };
 }
 
+// Avviso per i protocolli binari/non-testuali (non rispondono ai comandi digitati a mano).
+function connectNote(port) {
+  const notes = {
+    53: 'DNS è un protocollo binario: non risponde ai comandi di testo. Usa  nslookup nome <ip>',
+    3389: 'RDP è binario: usa un client Desktop Remoto  (mstsc /v:<ip>)',
+    5900: 'VNC è binario: usa un client VNC',
+    445: 'SMB è binario: usa  smbclient  o Esplora risorse  (\\\\<ip>)',
+    139: 'NetBIOS/SMB è binario',
+    1883: 'MQTT è binario: usa  mosquitto_sub -h <ip> -t #',
+    161: 'SNMP è binario: usa  snmpwalk',
+    5353: 'mDNS è binario (UDP)',
+    22: 'SSH è cifrato: vedrai solo il banner. Per una sessione completa usa  ssh user@<ip>',
+    62078: 'Porta iOS (lockdownd): non interrogabile a mano',
+  };
+  return notes[port] || null;
+}
+
 // Gestisce un upgrade WebSocket → apre un socket TCP reale verso ip:port e fa da ponte bidirezionale.
 function handleWsUpgrade(req, socket) {
   try {
@@ -94,12 +111,19 @@ function handleWsUpgrade(req, socket) {
   if (!isPrivateIp(ip)) { wsSend(socket, '\x1b[31mPer sicurezza sono consentite solo connessioni a IP della rete locale.\x1b[0m\r\n'); socket.end(); return; }
 
   wsSend(socket, `\x1b[36mConnessione TCP reale a ${ip}:${port}...\x1b[0m\r\n`);
-  const target = net.connect({ host: ip, port, timeout: 8000 });
-  target.on('connect', () => wsSend(socket, `\x1b[32m✓ Socket aperto su ${ip}:${port}\x1b[0m\r\n`));
+  const target = net.connect({ host: ip, port });
+  // Timeout SOLO per la fase di connessione; una volta aperta la sessione resta interattiva.
+  const connectTimer = setTimeout(() => { wsSend(socket, '\r\n\x1b[33m[timeout connessione]\x1b[0m\r\n'); try { target.destroy(); } catch {} }, 8000);
+  target.on('connect', () => {
+    clearTimeout(connectTimer);
+    target.setTimeout(0);   // niente idle-timeout: la sessione interattiva non si chiude da sola
+    wsSend(socket, `\x1b[32m✓ Socket aperto su ${ip}:${port}\x1b[0m\r\n`);
+    const note = connectNote(port);
+    if (note) wsSend(socket, `\x1b[33mℹ ${note}\x1b[0m\r\n`);
+  });
   target.on('data', (b) => wsSend(socket, b));
-  target.on('timeout', () => { wsSend(socket, '\r\n\x1b[33m[timeout]\x1b[0m\r\n'); target.destroy(); });
-  target.on('error', (e) => { wsSend(socket, `\r\n\x1b[31m[errore] ${e.message}\x1b[0m\r\n`); try { socket.end(); } catch {} });
-  target.on('close', () => { wsSend(socket, '\r\n\x1b[90m[connessione chiusa]\x1b[0m\r\n'); try { socket.end(); } catch {} });
+  target.on('error', (e) => { clearTimeout(connectTimer); wsSend(socket, `\r\n\x1b[31m[errore] ${e.message}\x1b[0m\r\n`); try { socket.end(); } catch {} });
+  target.on('close', () => { clearTimeout(connectTimer); wsSend(socket, '\r\n\x1b[90m[connessione chiusa]\x1b[0m\r\n'); try { socket.end(); } catch {} });
 
   let buffer = Buffer.alloc(0);
   socket.on('data', (chunk) => {
