@@ -6,6 +6,7 @@ import { Eye, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import NavActions from '@/components/NavActions';
 import NewDeviceWatcher from '@/components/NewDeviceWatcher';
+import ThreatWatcher from '@/components/ThreatWatcher';
 import NotificationsBell from '@/components/NotificationsBell';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -99,6 +100,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             <NewDeviceWatcher />
+            <ThreatWatcher />
         </div>
     );
 }

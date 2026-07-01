@@ -17,6 +17,9 @@ const ConnectionsMap = dynamic(() => import('@/components/ConnectionsMap'), {
     loading: () => <div className="h-full flex items-center justify-center text-sm text-gray-400">Caricamento mappa…</div>,
 });
 
+const flagEmoji = (cc?: string | null) =>
+    cc && cc.length === 2 ? cc.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0))) : '';
+
 const fmtRate = (kbps: number) => (kbps >= 1024 ? `${(kbps / 1024).toFixed(2)} MB/s` : `${kbps.toFixed(0)} KB/s`);
 const fmtBytes = (b: number) => {
     if (b >= 1e9) return `${(b / 1e9).toFixed(2)} GB`;
@@ -151,12 +154,15 @@ export default function TrafficoPage() {
                                 {connections.length === 0 ? (
                                     <tr><td colSpan={3} className="px-2 py-8 text-center text-gray-400">Nessuna connessione attiva</td></tr>
                                 ) : connections.map((c, i) => (
-                                    <tr key={i} onClick={() => setSelConn(c)} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
+                                    <tr key={i} onClick={() => setSelConn(c)} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer ${(c.malicious || 0) > 0 ? 'bg-red-50 dark:bg-red-900/10' : ''}`}>
                                         <td className="px-2 py-2">
-                                            <div className="font-medium text-gray-900 dark:text-white truncate max-w-[180px]" title={c.remoteHost || c.remoteIp}>
-                                                {c.remoteHost || c.remoteIp}
+                                            <div className="font-medium text-gray-900 dark:text-white truncate max-w-[180px] flex items-center gap-1" title={c.remoteHost || c.remoteIp}>
+                                                {(c.malicious || 0) > 0 && <span title="Segnalato malevolo (VirusTotal)">🛑</span>}
+                                                {!((c.malicious || 0) > 0) && c.threat && <span title={c.threat}>⚠️</span>}
+                                                {flagEmoji(c.countryCode)}
+                                                <span className="truncate">{c.remoteHost || c.remoteIp}</span>
                                             </div>
-                                            <div className="text-xs text-gray-400 font-mono">{c.remoteIp}:{c.remotePort}</div>
+                                            <div className="text-xs text-gray-400 font-mono">{c.remoteIp}:{c.remotePort}{c.process ? ` · ${c.process}` : ''}</div>
                                         </td>
                                         <td className="px-2 py-2">
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">

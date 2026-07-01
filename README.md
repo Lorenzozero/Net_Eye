@@ -81,7 +81,8 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🤖 **Gestione Agent** — scarica installer (Windows `.bat`, Linux `.sh`, Python) e monitora gli agent registrati.
 - 🌙 **Dark / Light mode** — toggle in navbar che pilota davvero il tema (Tailwind v4 `@custom-variant`), persistente in localStorage.
 - 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
-- 🔗 **Analisi flussi/connessioni** — `netstat` mostra le connessioni attive con **protocollo** (HTTPS, DNS, SSH…), **da quale dispositivo** e **verso quale destinazione**, risolta con **reverse DNS + organizzazione** (Cloudflare, Fastly, Anthropic, Google…), in tabella e su **mappa dei flussi cliccabile**.
+- 🔗 **Analisi flussi/connessioni avanzata** — connessioni reali con **protocollo**, **programma sorgente** (claude.exe, brave.exe…), **geolocalizzazione 🌍**, **ASN + organizzazione** (Cloudflare, Anthropic, Google…), rilevamento **porte trojan/worm** e **VirusTotal** per gli IP malevoli — in tabella e su **mappa dei flussi cliccabile**.
+- 🛑 **Rilevamento IP malevoli (VirusTotal)** — con `VT_API_KEY` ogni IP pubblico è verificato su VirusTotal; i flussi malevoli sono evidenziati e generano una **notifica** in cronologia.
 - 🖱️ **Dettagli ovunque** — click su qualsiasi dispositivo (inventario, tabelle reti, **nodo della mappa**) apre il dettaglio completo; click su un flusso del traffico apre il dettaglio della connessione.
 - 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
@@ -173,7 +174,10 @@ Tutte le tecniche sono **attive e reali**, implementate in `server.mjs` con i so
 |---|---|---|
 | **Tabella connessioni attive** | `netstat -ano` (stati ESTABLISHED) | flussi in corso da/verso l'host |
 | **Classificazione protocollo** | mappatura porta→servizio | HTTPS, DNS, SSH, MQTT, RTSP… (TCP/UDP) |
-| **Risoluzione destinazione** | reverse DNS (PTR) + lookup **organizzazione/ISP** (ip-api, cachato) per gli IP senza PTR | *dove* va il traffico (Cloudflare, Fastly, Anthropic, Google…) |
+| **Risoluzione destinazione** | reverse DNS (PTR) + **geolocalizzazione, ASN e organizzazione/ISP** (ip-api, cachato) | *dove* va il traffico: 🇺🇸 Anthropic `AS399358`, 🇨🇦 Cloudflare `AS13335`, Google, AWS… |
+| **Programma sorgente** | PID di `netstat -ano` → nome processo via `tasklist` (Windows) | **quale programma** genera il traffico (claude.exe, brave.exe, svchost.exe…) |
+| **Minacce note** | porte usate da trojan/worm/backdoor (Back Orifice, NetBus, SubSeven, Mirai, MyDoom…) | flag ⚠️ sui flussi verso porte sospette |
+| **VirusTotal** | verifica gli IP pubblici su VirusTotal (`VT_API_KEY`, cachato + throttolato) | 🛑 evidenzia gli **IP malevoli** + notifica automatica |
 | **Connessione per porta** | URL browser per le porte web; per le altre un **socket TCP reale** via proxy WebSocket (`/api/v1/connect`, RFC6455 implementato senza dipendenze, ristretto agli IP LAN) → terminale interattivo | parlare davvero col servizio (HTTP/Telnet/Redis/SMTP…) in un click |
 
 ### 🛡️ Sicurezza
@@ -402,12 +406,13 @@ NetworkScope è pensato come **strumento di monitoraggio della propria rete loca
 | **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918); con `NS_TOKEN` attivo richiede anche il token | tenere il server su rete fidata + token |
 | **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN + token |
 | **Trasporto** | HTTP/WS in chiaro | mettere dietro reverse proxy con **HTTPS/WSS** |
-| **Lookup organizzazione** | invia gli **IP di destinazione pubblici** a `ip-api.com` | disattivabile per restare 100% offline (vedi `lookupOrg` in `server.mjs`) |
+| **Lookup geo/ASN/org** | invia gli **IP di destinazione pubblici** a `ip-api.com` | disattivabile per restare 100% offline (vedi `lookupIpInfo` in `server.mjs`) |
+| **VirusTotal** | opzionale (`VT_API_KEY`): invia gli **IP pubblici** a VirusTotal per il check malevoli | non impostare la chiave se non vuoi consultare servizi esterni |
 
 **Esempio con autenticazione:**
 ```bash
-# backend
-NS_TOKEN=un-segreto-forte npm run backend
+# backend (con auth + VirusTotal opzionale)
+NS_TOKEN=un-segreto-forte VT_API_KEY=la-tua-chiave-virustotal npm run backend
 # frontend
 NEXT_PUBLIC_NS_TOKEN=un-segreto-forte npm run dev
 # agente su un'altra macchina
@@ -442,6 +447,8 @@ NS_TOKEN=un-segreto-forte npm run agent -- --agent http://SERVER:8000
 - [x] 🔐 Autenticazione a token opzionale (API + WebSocket + agenti)
 - [x] 🧪 Test automatici con Vitest (`npm test`)
 - [x] 🐳 `docker-compose` frontend + backend con un comando
+- [x] 🌍 Flussi arricchiti: geolocalizzazione + ASN + **programma sorgente** (tasklist)
+- [x] 🛑 Integrazione **VirusTotal** (IP malevoli) + notifica automatica
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🧪 Test end-to-end (Playwright)
 - [ ] 👥 Multi-utente / ruoli

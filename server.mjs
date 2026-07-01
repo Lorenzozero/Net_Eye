@@ -287,8 +287,22 @@ function publishDevices() {
 const vendorCache = loadCache();
 const vendorQueue = [];
 let queueRunning = false;
-const dnsCache = new Map(); // ip → hostname PTR (reverse DNS)
-const orgCache = new Map(); // ip → organizzazione/ISP (per IP senza PTR)
+const dnsCache = new Map();   // ip → hostname PTR (reverse DNS)
+const ipInfoCache = new Map(); // ip → { org, asn, country, countryCode, city }
+const vtCache = new Map();     // ip → { malicious, suspicious, harmless } (VirusTotal)
+const vtQueue = [];
+let vtRunning = false;
+let procMap = { at: 0, map: {} }; // cache PID→processo
+
+const VT_API_KEY = process.env.VT_API_KEY || null; // integrazione VirusTotal (opzionale)
+
+// Porte note usate da trojan/worm/backdoor → segnalazione (identificazione minacce di base).
+const THREAT_PORTS = {
+  1337: 'shell/backdoor', 2323: 'Telnet/Mirai (IoT botnet)', 3127: 'worm MyDoom', 2745: 'worm Bagle',
+  4444: 'Metasploit/reverse shell', 5554: 'worm Sasser', 6667: 'IRC (C2 botnet)', 6668: 'IRC (C2 botnet)',
+  9996: 'shell', 12345: 'trojan NetBus', 27374: 'trojan SubSeven', 31337: 'trojan Back Orifice',
+  54321: 'trojan BackOrifice2000', 65000: 'backdoor', 20034: 'trojan NetBus 2',
+};
 
 // Porta → servizio/protocollo applicativo (per capire "di che pacchetti si tratta")
 const SERVICES = {
@@ -861,17 +875,23 @@ async function reverseDnsT(ip) {
   return Promise.race([reverseDns(ip), new Promise((r) => setTimeout(() => r(null), 1500))]);
 }
 
-// Lookup dell'organizzazione/ISP per gli IP pubblici senza PTR (ip-api.com, gratuito, best-effort).
-function lookupOrg(ip) {
+// Geolocalizzazione + ASN + organizzazione/ISP per un IP pubblico (ip-api.com, gratuito, best-effort).
+function lookupIpInfo(ip) {
   return new Promise((resolve) => {
     try {
-      const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as`, { timeout: 1500 }, (res) => {
+      const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as,country,countryCode,city`, { timeout: 2000 }, (res) => {
         let b = '';
         res.on('data', (c) => (b += c));
         res.on('end', () => {
           try {
             const j = JSON.parse(b);
-            resolve(j.status === 'success' ? (j.org || j.isp || (j.as || '').replace(/^AS\d+\s*/, '') || null) : null);
+            if (j.status !== 'success') return resolve(null);
+            const asMatch = (j.as || '').match(/^AS(\d+)\s*(.*)$/);
+            resolve({
+              org: j.org || j.isp || (asMatch ? asMatch[2] : null) || null,
+              asn: asMatch ? `AS${asMatch[1]}` : null,
+              country: j.country || null, countryCode: j.countryCode || null, city: j.city || null,
+            });
           } catch { resolve(null); }
         });
       });
@@ -881,8 +901,64 @@ function lookupOrg(ip) {
   });
 }
 
+// Mappa PID → nome processo (quale programma genera traffico). Windows via tasklist. Cache breve.
+async function processMap() {
+  if (!isWin) return {};
+  if (Date.now() - procMap.at < 10_000) return procMap.map;
+  const map = {};
+  try {
+    const out = await run('tasklist /fo csv /nh', 4000);
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/^"([^"]+)","(\d+)"/);
+      if (m) map[m[2]] = m[1];
+    }
+  } catch { /* ignore */ }
+  procMap = { at: Date.now(), map };
+  return map;
+}
+
+// VirusTotal: verifica se un IP è segnalato come malevolo (richiede VT_API_KEY). Cachato + throttolato.
+function vtLookup(ip) {
+  return new Promise((resolve) => {
+    try {
+      const req = https.get(`https://www.virustotal.com/api/v3/ip_addresses/${ip}`, { headers: { 'x-apikey': VT_API_KEY }, timeout: 8000 }, (res) => {
+        let b = '';
+        res.on('data', (c) => (b += c));
+        res.on('end', () => {
+          try {
+            const s = JSON.parse(b)?.data?.attributes?.last_analysis_stats;
+            resolve(s ? { malicious: s.malicious || 0, suspicious: s.suspicious || 0, harmless: s.harmless || 0 } : null);
+          } catch { resolve(null); }
+        });
+      });
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+    } catch { resolve(null); }
+  });
+}
+function checkVT(ip) {
+  if (!VT_API_KEY) return null;
+  if (vtCache.has(ip)) return vtCache.get(ip);
+  if (!vtQueue.includes(ip)) { vtQueue.push(ip); runVtQueue(); }
+  return null;
+}
+async function runVtQueue() {
+  if (vtRunning || !VT_API_KEY) return;
+  vtRunning = true;
+  while (vtQueue.length) {
+    const ip = vtQueue.shift();
+    if (vtCache.has(ip)) continue;
+    const stats = await vtLookup(ip);
+    vtCache.set(ip, stats);
+    if (stats && stats.malicious > 0) console.log(`🚨 VirusTotal: ${ip} segnalato MALEVOLO da ${stats.malicious} motori`);
+    await new Promise((r) => setTimeout(r, 16000)); // free tier ~4 richieste/min
+  }
+  vtRunning = false;
+}
+
 async function getConnections() {
-  const out = await run(isWin ? 'netstat -ano' : "ss -tn state established 2>/dev/null || netstat -tn");
+  const out = await run(isWin ? 'netstat -ano' : "netstat -tn 2>/dev/null || ss -tn");
+  const procs = await processMap();
   const agg = new Map();
   for (const line of out.split(/\r?\n/)) {
     const p = line.trim().split(/\s+/);
@@ -893,32 +969,44 @@ async function getConnections() {
     const [lip, lport] = splitAddr(p[1]);
     const [rip, rport] = splitAddr(p[2]);
     if (!rip || !lip || isLocalAddr(rip) || rip === lip) continue;
+    const pid = isWin ? p[4] : null;
     const service = svc(Number(rport), Number(lport));
     const key = `${rip}|${service}`;
     const e = agg.get(key) || {
       remoteIp: rip, remotePort: Number(rport), service, proto, count: 0,
-      localIps: new Set(), scope: rip.startsWith(local.base + '.') ? 'LAN' : 'Internet',
+      localIps: new Set(), procs: new Set(), scope: rip.startsWith(local.base + '.') ? 'LAN' : 'Internet',
     };
     e.count++; e.localIps.add(lip);
+    if (pid && procs[pid]) e.procs.add(procs[pid]);
     agg.set(key, e);
   }
-  const list = [...agg.values()].map((e) => ({ ...e, localIps: [...e.localIps] }));
-  // Risoluzione destinazioni: reverse DNS (PTR) + lookup organizzazione per gli IP pubblici senza PTR.
+  const list = [...agg.values()].map((e) => ({ ...e, localIps: [...e.localIps], process: [...e.procs][0] || null, procs: undefined }));
+
+  // Risoluzione destinazioni: PTR + geolocalizzazione/ASN/org (per gli IP pubblici) + VirusTotal.
   await Promise.all([...new Set(list.map((e) => e.remoteIp))].map(async (ip) => {
     if (!dnsCache.has(ip)) dnsCache.set(ip, await reverseDnsT(ip));
-    if (!dnsCache.get(ip) && !orgCache.has(ip) && !ip.startsWith(local.base + '.')) {
-      orgCache.set(ip, await lookupOrg(ip));
-    }
+    const isPublic = !ip.startsWith(local.base + '.');
+    if (isPublic && !ipInfoCache.has(ip)) ipInfoCache.set(ip, await lookupIpInfo(ip));
   }));
+
   for (const e of list) {
     const ptr = dnsCache.get(e.remoteIp) || null;
-    const org = orgCache.get(e.remoteIp) || null;
-    e.remoteHost = ptr || (org ? `${org}` : null);
-    e.org = org;
+    const info = ipInfoCache.get(e.remoteIp) || null;
+    e.remoteHost = ptr || info?.org || null;
+    e.org = info?.org || null;
+    e.asn = info?.asn || null;
+    e.country = info?.country || null;
+    e.countryCode = info?.countryCode || null;
+    e.city = info?.city || null;
+    e.threat = THREAT_PORTS[e.remotePort] || null;
+    const vt = e.scope === 'Internet' ? checkVT(e.remoteIp) : null;
+    e.malicious = vt?.malicious || 0;
+    e.vt = vt || null;
     const dev = devices.find((d) => d.ip_address === e.localIps[0]);
     e.fromHost = dev?.hostname || (e.localIps[0] === local.ip ? os.hostname() : e.localIps[0]);
   }
-  list.sort((a, b) => b.count - a.count);
+  // Ordina: prima le connessioni sospette/malevole, poi per conteggio
+  list.sort((a, b) => (b.malicious - a.malicious) || ((b.threat ? 1 : 0) - (a.threat ? 1 : 0)) || (b.count - a.count));
   return list.slice(0, 60);
 }
 

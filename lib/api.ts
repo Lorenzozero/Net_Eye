@@ -83,6 +83,14 @@ export interface Connection {
     remotePort: number;
     remoteHost: string | null;
     org?: string | null;
+    asn?: string | null;
+    country?: string | null;
+    countryCode?: string | null;
+    city?: string | null;
+    process?: string | null;
+    threat?: string | null;
+    malicious?: number;
+    vt?: { malicious: number; suspicious: number; harmless: number } | null;
     service: string;
     proto: string;
     count: number;
