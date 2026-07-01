@@ -100,6 +100,28 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 
 ## 🖼️ Le schermate
 
+<table>
+  <tr>
+    <td width="50%"><img src="assets/home.png" alt="Dashboard — KPI, topologia di rete e traffico live" /></td>
+    <td width="50%"><img src="assets/traffico.png" alt="Traffico — mappa dei flussi, dettaglio flusso e connessioni" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>🏠 Dashboard</b><br/>KPI, topologia di rete con dettaglio dispositivo e traffico in tempo reale</td>
+    <td align="center"><b>📈 Traffico</b><br/>Mappa dei flussi, dettaglio connessione (sorgente → destinazione, ASN, servizio) e tabella</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/dispositivi.png" alt="Dispositivi — inventario e terminale SSH reale" /></td>
+    <td width="50%" valign="top">
+      <br/>
+      <b>📇 Dispositivi + 🖥️ Terminale reale</b><br/>
+      Inventario completo con dettagli di sicurezza e, per ogni porta aperta, un
+      <b>terminale interattivo reale</b> (qui una sessione <code>SSH</code> verso un Raspberry Pi
+      con banner OpenSSH reale). Le altre schermate — <b>🗺️ Mappa</b> topologica a schermo
+      intero e <b>⚙️ Impostazioni</b> — completano l'app.
+    </td>
+  </tr>
+</table>
+
 | Rotta | Pagina | Cosa fa |
 |---|---|---|
 | `/` | 🏠 **Dashboard** | Hub: KPI, topologia compatta, traffico, azioni rapide |
