@@ -82,8 +82,9 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🌙 **Dark / Light mode** — toggle in navbar che pilota davvero il tema (Tailwind v4 `@custom-variant`), persistente in localStorage.
 - 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
 - 🔗 **Analisi flussi/connessioni avanzata** — connessioni reali con **protocollo**, **programma sorgente** (claude.exe, brave.exe…), **geolocalizzazione 🌍**, **ASN + organizzazione** (Cloudflare, Anthropic, Google…), rilevamento **porte trojan/worm** e **VirusTotal** per gli IP malevoli — in tabella e su **mappa dei flussi cliccabile**.
-- 🛑 **Rilevamento IP malevoli (VirusTotal)** — con `VT_API_KEY` ogni IP pubblico è verificato su VirusTotal; i flussi malevoli sono evidenziati e generano una **notifica** in cronologia.
-- 🏆 **Top talkers + grafo connessioni** — classifiche "chi comunica di più" per **host · servizi · programmi**, e un **grafo programma → host** delle connessioni più frequenti (es. `claude.exe → Anthropic`).
+- 🛑 **Rilevamento IP malevoli (VirusTotal)** — imposta la chiave API **direttamente dalle Impostazioni** (o via `VT_API_KEY`) e ogni IP pubblico è verificato su VirusTotal; i flussi malevoli sono evidenziati e generano una **notifica** in cronologia. La chiave è salvata solo in locale (`.ns-config.json`).
+- 🏆 **Top talkers + grafo connessioni** — classifiche "chi comunica di più" per **host · servizi · programmi**, e un **grafo dispositivo → programma → host** delle connessioni più frequenti (es. `PC-Lorenzo → claude.exe → Anthropic`).
+- 🌍 **Mappa geografica dei flussi** — planisfero con **continenti nominati e colorati**, zoom/pan, città e paese di destinazione; i flussi mostrati provengono **solo dalle macchine monitorate** (server + agenti), non da tutti i dispositivi della rete.
 - 🖱️ **Dettagli ovunque** — click su qualsiasi dispositivo (inventario, tabelle reti, **nodo della mappa**) apre il dettaglio completo; click su un flusso del traffico apre il dettaglio della connessione.
 - 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
@@ -105,7 +106,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 | `/dispositivi` | 📇 **Dispositivi** | Inventario completo con ricerca e dettagli di sicurezza |
 | `/mappa` | 🗺️ **Mappa** | Topologia a schermo intero, interattiva |
 | `/traffico` | 📈 **Traffico** | Throughput e **pacchetti/s in tempo reale**, totali, **mappa dei flussi** + **mappa geografica** (paese/città), connessioni con programma/ASN/VirusTotal |
-| `/impostazioni` | ⚙️ **Impostazioni** | Agent, download installer, tema, notifiche |
+| `/impostazioni` | ⚙️ **Impostazioni** | Agent, download installer, tema, notifiche, **chiave API VirusTotal** |
 
 ---
 
@@ -375,7 +376,7 @@ NetworkScope è pensato come **strumento di monitoraggio della propria rete loca
 | **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN + token |
 | **Trasporto** | HTTP/WS in chiaro | mettere dietro reverse proxy con **HTTPS/WSS** |
 | **Lookup geo/ASN/org** | invia gli **IP di destinazione pubblici** a `ip-api.com` | disattivabile per restare 100% offline (vedi `lookupIpInfo` in `server.mjs`) |
-| **VirusTotal** | opzionale (`VT_API_KEY`): invia gli **IP pubblici** a VirusTotal per il check malevoli | non impostare la chiave se non vuoi consultare servizi esterni |
+| **VirusTotal** | opzionale (`VT_API_KEY` o chiave impostata dalle **Impostazioni**, salvata in `.ns-config.json`): invia gli **IP pubblici** a VirusTotal per il check malevoli | non impostare la chiave se non vuoi consultare servizi esterni; `.ns-config.json` è in `.gitignore` |
 
 **Esempio con autenticazione:**
 ```bash

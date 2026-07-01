@@ -7,7 +7,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { fetchTraffic, fetchConnections, TrafficData, TrafficPoint, Connection } from '@/lib/api';
 import ConnectionModal from '@/components/ConnectionModal';
 import TopTalkers from '@/components/TopTalkers';
-import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe, GitFork } from 'lucide-react';
+import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe, GitFork, Info } from 'lucide-react';
 
 const TopFlowsGraph = dynamic(() => import('@/components/TopFlowsGraph'), { ssr: false });
 
@@ -103,6 +103,20 @@ export default function TrafficoPage() {
                     Backend non raggiungibile. Avvia lo scanner con <code className="font-mono mx-1">npm run backend</code> per i dati reali.
                 </div>
             )}
+
+            {(() => {
+                const hosts = [...new Set(connections.map((c) => c.fromHost).filter(Boolean))];
+                return (
+                    <div className="mb-6 flex items-start gap-2 rounded-lg border border-sky-200 dark:border-sky-900/40 bg-sky-50 dark:bg-sky-900/20 px-4 py-3 text-sm text-sky-800 dark:text-sky-200">
+                        <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span>
+                            Le connessioni e i flussi mostrati provengono <strong>solo dalle macchine monitorate</strong>
+                            {hosts.length > 0 ? <> ({hosts.map((h, i) => <span key={h}><code className="font-mono">{h}</code>{i < hosts.length - 1 ? ', ' : ''}</span>)})</> : null}
+                            , non da tutti i dispositivi della rete. Per vedere il traffico di un altro dispositivo (Raspberry, un altro PC…) installa un <strong>agent</strong> su quel dispositivo dalle <a href="/impostazioni" className="underline font-medium">Impostazioni</a>.
+                        </span>
+                    </div>
+                );
+            })()}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                 <Stat icon={<ArrowDown className="w-6 h-6 text-sky-600 dark:text-sky-400" />} color="bg-sky-50 dark:bg-sky-900/20"

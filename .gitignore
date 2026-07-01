@@ -46,6 +46,7 @@ oui-db.json
 state.json
 backend.log
 .agent-id
+.ns-config.json
 
 # typescript
 *.tsbuildinfo

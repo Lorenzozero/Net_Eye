@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { fetchAgents, deleteAgent } from '@/lib/api';
+import { fetchAgents, deleteAgent, fetchConfig, setVtApiKey } from '@/lib/api';
 import { Agent } from '@/types';
 import {
-    Bell, Cpu, Terminal, Download,
+    Bell, Cpu, Terminal, Download, ShieldAlert,
     Monitor, Server, RefreshCw, Trash2, CheckCircle, XCircle, Clock
 } from 'lucide-react';
 
@@ -14,6 +14,24 @@ export default function ImpostazioniPage() {
     const [serverUrl, setServerUrl] = useState('http://localhost:8000');
     const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
     const [notifications, setNotifications] = useState(true);
+    const [vtKey, setVtKey] = useState('');
+    const [vtConfigured, setVtConfigured] = useState(false);
+    const [savingVt, setSavingVt] = useState(false);
+
+    const saveVt = async () => {
+        setSavingVt(true);
+        try {
+            const r = await setVtApiKey(vtKey);
+            setVtConfigured(r.vtConfigured);
+            setVtKey('');
+            setToast({ msg: r.vtConfigured ? 'Chiave VirusTotal salvata' : 'Chiave VirusTotal rimossa', type: 'success' });
+        } catch {
+            setToast({ msg: 'Errore nel salvataggio della chiave', type: 'error' });
+        } finally {
+            setSavingVt(false);
+            setTimeout(() => setToast(null), 2500);
+        }
+    };
 
     // Le impostazioni si salvano automaticamente (localStorage), senza pulsante "Salva".
     const toggleNotifications = () => {
@@ -52,12 +70,12 @@ export default function ImpostazioniPage() {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- hostname disponibile solo lato client
             setServerUrl(`http://${window.location.hostname}:8000`);
             const savedNotif = localStorage.getItem('ns:notifications');
             if (savedNotif !== null) setNotifications(savedNotif === 'true');
         }
         loadAgents();
+        fetchConfig().then((c) => setVtConfigured(c.vtConfigured)).catch(() => { });
         const interval = setInterval(loadAgents, 15000);
         window.addEventListener('ns:refresh', loadAgents);
         return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadAgents); };
@@ -309,6 +327,51 @@ export default function ImpostazioniPage() {
                             <span className={`${notifications ? 'translate-x-6' : 'translate-x-1'} inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform`} />
                         </button>
                     </div>
+                </div>
+
+                {/* VirusTotal */}
+                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-slate-200/70 dark:border-white/10">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg mr-3">
+                                <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">VirusTotal</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Analizza gli IP remoti e segnala quelli malevoli</p>
+                            </div>
+                        </div>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${vtConfigured ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                            {vtConfigured ? 'Configurata' : 'Non configurata'}
+                        </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="password"
+                            value={vtKey}
+                            onChange={(e) => setVtKey(e.target.value)}
+                            placeholder={vtConfigured ? '•••••••••• (inserisci una nuova chiave per sostituirla)' : 'Incolla qui la tua API key VirusTotal'}
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <button
+                            onClick={saveVt}
+                            disabled={savingVt || !vtKey.trim()}
+                            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {savingVt ? 'Salvataggio…' : 'Salva chiave'}
+                        </button>
+                        {vtConfigured && (
+                            <button
+                                onClick={() => { setVtKey(''); setVtConfigured(false); setVtApiKey('').then((r) => setVtConfigured(r.vtConfigured)).catch(() => { }); }}
+                                className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
+                            >
+                                Rimuovi
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        Ottieni una chiave gratuita su <span className="text-indigo-500">virustotal.com</span>. La chiave è salvata solo sul tuo server locale (<code>.ns-config.json</code>) e usata per interrogare l&apos;API di VirusTotal sugli IP verso cui la tua rete comunica.
+                    </p>
                 </div>
             </div>
 

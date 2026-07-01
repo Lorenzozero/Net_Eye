@@ -294,7 +294,11 @@ const vtQueue = [];
 let vtRunning = false;
 let procMap = { at: 0, map: {} }; // cache PID→processo
 
-const VT_API_KEY = process.env.VT_API_KEY || null; // integrazione VirusTotal (opzionale)
+// Integrazione VirusTotal (opzionale): da env oppure impostata a runtime dalle Impostazioni.
+const CONFIG_FILE = new URL('./.ns-config.json', import.meta.url);
+let vtApiKey = process.env.VT_API_KEY || null;
+(() => { try { const c = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); if (!vtApiKey && c.vtApiKey) vtApiKey = c.vtApiKey; } catch { /* no config */ } })();
+function saveConfig() { try { writeFileSync(CONFIG_FILE, JSON.stringify({ vtApiKey })); } catch { /* ignore */ } }
 
 // Porte note usate da trojan/worm/backdoor → segnalazione (identificazione minacce di base).
 const THREAT_PORTS = {
@@ -922,7 +926,7 @@ async function processMap() {
 function vtLookup(ip) {
   return new Promise((resolve) => {
     try {
-      const req = https.get(`https://www.virustotal.com/api/v3/ip_addresses/${ip}`, { headers: { 'x-apikey': VT_API_KEY }, timeout: 8000 }, (res) => {
+      const req = https.get(`https://www.virustotal.com/api/v3/ip_addresses/${ip}`, { headers: { 'x-apikey': vtApiKey }, timeout: 8000 }, (res) => {
         let b = '';
         res.on('data', (c) => (b += c));
         res.on('end', () => {
@@ -938,13 +942,13 @@ function vtLookup(ip) {
   });
 }
 function checkVT(ip) {
-  if (!VT_API_KEY) return null;
+  if (!vtApiKey) return null;
   if (vtCache.has(ip)) return vtCache.get(ip);
   if (!vtQueue.includes(ip)) { vtQueue.push(ip); runVtQueue(); }
   return null;
 }
 async function runVtQueue() {
-  if (vtRunning || !VT_API_KEY) return;
+  if (vtRunning || !vtApiKey) return;
   vtRunning = true;
   while (vtQueue.length) {
     const ip = vtQueue.shift();
@@ -1005,8 +1009,8 @@ async function getConnections() {
     const vt = e.scope === 'Internet' ? checkVT(e.remoteIp) : null;
     e.malicious = vt?.malicious || 0;
     e.vt = vt || null;
-    const dev = devices.find((d) => d.ip_address === e.localIps[0]);
-    e.fromHost = dev?.hostname || (e.localIps[0] === local.ip ? os.hostname() : e.localIps[0]);
+    // Tutte queste connessioni originano da QUESTA macchina (lo scanner/agente).
+    e.fromHost = os.hostname();
   }
   // Ordina: prima le connessioni sospette/malevole, poi per conteggio
   list.sort((a, b) => (b.malicious - a.malicious) || ((b.threat ? 1 : 0) - (a.threat ? 1 : 0)) || (b.count - a.count));
@@ -1147,6 +1151,23 @@ const server = createServer(async (req, res) => {
       for (const c of (a.connections || [])) remote.push({ ...c, fromHost: c.fromHost || a.info.agent_hostname });
     }
     return json(res, 200, [...localConns, ...remote].slice(0, 120));
+  }
+
+  // Configurazione runtime (chiave VirusTotal) — impostabile dalle Impostazioni
+  if (req.method === 'GET' && pathname === '/api/v1/config') {
+    return json(res, 200, { vtConfigured: !!vtApiKey });
+  }
+  if (req.method === 'POST' && pathname === '/api/v1/config') {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      try {
+        const b = JSON.parse(raw || '{}');
+        if (typeof b.vtApiKey === 'string') { vtApiKey = b.vtApiKey.trim() || null; vtCache.clear(); saveConfig(); }
+      } catch { /* ignore */ }
+      json(res, 200, { vtConfigured: !!vtApiKey });
+    });
+    return;
   }
 
   if (req.method === 'GET' && pathname === '/api/v1/traffic') {

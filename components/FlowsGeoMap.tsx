@@ -7,15 +7,16 @@ import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 const flag = (cc?: string | null) =>
     cc && cc.length === 2 ? cc.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0))) : '';
 
-// Continenti approssimati (poligoni [lon,lat]) per uno sfondo mondo riconoscibile.
-const CONTINENTS: [number, number][][] = [
-    [[-165, 60], [-140, 68], [-100, 68], [-80, 62], [-64, 58], [-52, 47], [-70, 42], [-75, 35], [-82, 25], [-97, 17], [-105, 22], [-115, 28], [-124, 40], [-130, 50], [-140, 58]], // Nord America
-    [[-45, 60], [-30, 64], [-20, 72], [-32, 80], [-48, 80], [-55, 74], [-50, 66]], // Groenlandia
-    [[-78, 8], [-60, 5], [-50, 0], [-35, -6], [-40, -16], [-50, -26], [-60, -42], [-66, -52], [-72, -50], [-71, -35], [-70, -18], [-76, -5], [-80, 2]], // Sud America
-    [[-10, 58], [0, 60], [12, 64], [28, 60], [40, 56], [40, 46], [28, 44], [16, 40], [4, 38], [-6, 42], [-9, 44]], // Europa
-    [[-16, 30], [-8, 34], [10, 34], [24, 32], [32, 30], [43, 12], [51, 11], [48, -2], [40, -16], [30, -30], [20, -34], [15, -30], [10, -16], [8, 0], [-2, 6], [-12, 12], [-16, 22]], // Africa
-    [[30, 58], [45, 66], [70, 72], [100, 74], [130, 70], [160, 68], [178, 66], [168, 60], [145, 48], [135, 40], [122, 30], [110, 20], [100, 8], [92, 20], [80, 10], [72, 22], [58, 26], [48, 36], [40, 44], [34, 50]], // Asia
-    [[113, -20], [122, -16], [132, -12], [142, -12], [150, -22], [153, -30], [147, -38], [138, -36], [128, -32], [118, -34], [114, -28]], // Australia
+// Continenti approssimati (poligoni [lon,lat]) con nome, colore e centroide per l'etichetta.
+interface Continent { name: string; color: string; label: [number, number]; poly: [number, number][] }
+const CONTINENTS: Continent[] = [
+    { name: 'Nord America', color: '#38bdf8', label: [-100, 45], poly: [[-165, 60], [-140, 68], [-100, 68], [-80, 62], [-64, 58], [-52, 47], [-70, 42], [-75, 35], [-82, 25], [-97, 17], [-105, 22], [-115, 28], [-124, 40], [-130, 50], [-140, 58]] },
+    { name: 'Groenlandia', color: '#a5b4fc', label: [-40, 72], poly: [[-45, 60], [-30, 64], [-20, 72], [-32, 80], [-48, 80], [-55, 74], [-50, 66]] },
+    { name: 'Sud America', color: '#fbbf24', label: [-58, -18], poly: [[-78, 8], [-60, 5], [-50, 0], [-35, -6], [-40, -16], [-50, -26], [-60, -42], [-66, -52], [-72, -50], [-71, -35], [-70, -18], [-76, -5], [-80, 2]] },
+    { name: 'Europa', color: '#f472b6', label: [15, 50], poly: [[-10, 58], [0, 60], [12, 64], [28, 60], [40, 56], [40, 46], [28, 44], [16, 40], [4, 38], [-6, 42], [-9, 44]] },
+    { name: 'Africa', color: '#34d399', label: [18, 3], poly: [[-16, 30], [-8, 34], [10, 34], [24, 32], [32, 30], [43, 12], [51, 11], [48, -2], [40, -16], [30, -30], [20, -34], [15, -30], [10, -16], [8, 0], [-2, 6], [-12, 12], [-16, 22]] },
+    { name: 'Asia', color: '#fb923c', label: [95, 45], poly: [[30, 58], [45, 66], [70, 72], [100, 74], [130, 70], [160, 68], [178, 66], [168, 60], [145, 48], [135, 40], [122, 30], [110, 20], [100, 8], [92, 20], [80, 10], [72, 22], [58, 26], [48, 36], [40, 44], [34, 50]] },
+    { name: 'Oceania', color: '#c084fc', label: [134, -25], poly: [[113, -20], [122, -16], [132, -12], [142, -12], [150, -22], [153, -30], [147, -38], [138, -36], [128, -32], [118, -34], [114, -28]] },
 ];
 
 export default function FlowsGeoMap({ connections, onSelect }: { connections: Connection[]; onSelect?: (c: Connection) => void }) {
@@ -64,13 +65,17 @@ export default function FlowsGeoMap({ connections, onSelect }: { connections: Co
 
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full cursor-grab active:cursor-grabbing" onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}>
                 <g transform={`translate(${offset.x},${offset.y}) scale(${scale})`}>
-                    {/* continenti */}
-                    {CONTINENTS.map((poly, i) => (
-                        <path key={i} d={polyPath(poly)} className="fill-emerald-200/70 dark:fill-white/[0.07] stroke-emerald-300/60 dark:stroke-white/10" strokeWidth={0.5} />
+                    {/* continenti (ognuno con colore proprio) */}
+                    {CONTINENTS.map((c, i) => (
+                        <path key={i} d={polyPath(c.poly)} fill={c.color} fillOpacity={0.28} stroke={c.color} strokeOpacity={0.6} strokeWidth={0.6} />
                     ))}
                     {/* graticola */}
                     {[-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150].map((lon) => { const { x } = proj(0, lon); return <line key={`v${lon}`} x1={x} y1="0" x2={x} y2={H} className="stroke-slate-400/20 dark:stroke-white/5" strokeWidth={0.5} />; })}
                     {[-60, -30, 0, 30, 60].map((lat) => { const { y } = proj(lat, 0); return <line key={`h${lat}`} x1="0" y1={y} x2={W} y2={y} className="stroke-slate-400/20 dark:stroke-white/5" strokeWidth={0.5} />; })}
+                    {/* nomi dei continenti */}
+                    {CONTINENTS.map((c, i) => { const { x, y } = proj(c.label[1], c.label[0]); return (
+                        <text key={`cn${i}`} x={x} y={y} textAnchor="middle" fontSize={9 / scale} fontWeight="700" fill={c.color} fillOpacity={0.95} className="select-none pointer-events-none uppercase" style={{ letterSpacing: 0.5 }}>{c.name}</text>
+                    ); })}
 
                     {/* punti */}
                     {points.map((p, i) => {

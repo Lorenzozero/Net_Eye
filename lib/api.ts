@@ -106,3 +106,19 @@ export async function fetchConnections(): Promise<Connection[]> {
     if (!res.ok) throw new Error('Impossibile recuperare le connessioni');
     return res.json();
 }
+
+export async function fetchConfig(): Promise<{ vtConfigured: boolean }> {
+    const res = await apiFetch('/api/v1/config');
+    if (!res.ok) throw new Error('Impossibile recuperare la configurazione');
+    return res.json();
+}
+
+export async function setVtApiKey(vtApiKey: string): Promise<{ vtConfigured: boolean }> {
+    const res = await apiFetch('/api/v1/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vtApiKey }),
+    });
+    if (!res.ok) throw new Error('Impossibile salvare la configurazione');
+    return res.json();
+}
