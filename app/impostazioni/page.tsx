@@ -16,6 +16,7 @@ export default function ImpostazioniPage() {
     const [notifications, setNotifications] = useState(true);
     const [vtKey, setVtKey] = useState('');
     const [vtConfigured, setVtConfigured] = useState(false);
+    const [offline, setOffline] = useState(false);
     const [savingVt, setSavingVt] = useState(false);
 
     const saveVt = async () => {
@@ -75,7 +76,7 @@ export default function ImpostazioniPage() {
             if (savedNotif !== null) setNotifications(savedNotif === 'true');
         }
         loadAgents();
-        fetchConfig().then((c) => setVtConfigured(c.vtConfigured)).catch(() => { });
+        fetchConfig().then((c) => { setVtConfigured(c.vtConfigured); setOffline(!!c.offline); }).catch(() => { });
         const interval = setInterval(loadAgents, 15000);
         window.addEventListener('ns:refresh', loadAgents);
         return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadAgents); };
@@ -369,6 +370,11 @@ export default function ImpostazioniPage() {
                             </button>
                         )}
                     </div>
+                    {offline && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                            ⚠️ Modalità <code>NS_OFFLINE</code> attiva: le chiamate a servizi terzi (VirusTotal, geolocalizzazione) sono disabilitate. La chiave non verrà usata finché non disattivi l&apos;offline.
+                        </p>
+                    )}
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                         Ottieni una chiave gratuita su <span className="text-indigo-500">virustotal.com</span>. La chiave è salvata solo sul tuo server locale (<code>.ns-config.json</code>) e usata per interrogare l&apos;API di VirusTotal sugli IP verso cui la tua rete comunica.
                     </p>

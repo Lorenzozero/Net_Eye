@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { API_URL, WS_TOKEN_QS } from '@/lib/api';
+import { wsUrl, getWsTicket } from '@/lib/api';
 import { X, Copy, Check } from 'lucide-react';
 
 // Parser ANSI minimale (SGR): colora l'output del terminale.
@@ -42,18 +42,25 @@ export default function TerminalModal({ ip, port, title, hint, onClose }: { ip: 
     const bodyRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        const wsBase = API_URL.replace(/^http/, 'ws');
-        const ws = new WebSocket(`${wsBase}/api/v1/connect?ip=${encodeURIComponent(String(ip))}&port=${port}${WS_TOKEN_QS}`);
-        ws.binaryType = 'arraybuffer';
-        wsRef.current = ws;
-        ws.onopen = () => { setStatus('open'); bodyRef.current?.focus(); };
-        ws.onmessage = (ev) => {
-            const text = typeof ev.data === 'string' ? ev.data : new TextDecoder('utf-8', { fatal: false }).decode(ev.data as ArrayBuffer);
-            setOutput((o) => (o + text).slice(-30000));
-        };
-        ws.onclose = () => setStatus('closed');
-        ws.onerror = () => setStatus('closed');
-        return () => { try { ws.close(); } catch { /* ignore */ } };
+        let cancelled = false;
+        let ws: WebSocket | null = null;
+        (async () => {
+            // Ticket monouso: nessun token nell'URL del WebSocket.
+            const ticket = await getWsTicket();
+            if (cancelled) return;
+            const tq = ticket ? `&ticket=${encodeURIComponent(ticket)}` : '';
+            ws = new WebSocket(`${wsUrl()}/api/v1/connect?ip=${encodeURIComponent(String(ip))}&port=${port}${tq}`);
+            ws.binaryType = 'arraybuffer';
+            wsRef.current = ws;
+            ws.onopen = () => { setStatus('open'); bodyRef.current?.focus(); };
+            ws.onmessage = (ev) => {
+                const text = typeof ev.data === 'string' ? ev.data : new TextDecoder('utf-8', { fatal: false }).decode(ev.data as ArrayBuffer);
+                setOutput((o) => (o + text).slice(-30000));
+            };
+            ws.onclose = () => setStatus('closed');
+            ws.onerror = () => setStatus('closed');
+        })();
+        return () => { cancelled = true; try { ws?.close(); } catch { /* ignore */ } };
     }, [ip, port]);
 
     useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [output]);

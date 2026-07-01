@@ -90,7 +90,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
 - 🔔 **Notifiche nuovi dispositivi + cronologia** — avviso in-app + notifica del browser quando compare un nuovo dispositivo; il **bell in navbar** apre la cronologia con **data e dettagli** e badge dei non letti.
-- 🔐 **Autenticazione a token opzionale** — con `NS_TOKEN` API, WebSocket e report degli agenti richiedono il token; non impostato resta aperto per l'uso locale.
+- 🔐 **Autenticazione a token opzionale (server-side)** — con `NS_TOKEN` API, WebSocket (via **ticket monouso**) e report degli agenti richiedono il token; il segreto resta lato server grazie a un **proxy same-origin** e non finisce nel bundle client. Non impostato = aperto per l'uso locale. Con `NS_OFFLINE=1` nessun dato va a servizi terzi.
 - 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
 - ⚡ **Scansione incrementale + persistenza** — cicli ~3× più veloci (arricchimento solo per device nuovi/stale), **storico** dispositivi salvato su disco e ripristinato al riavvio; **autostart** dello scanner al login senza admin.
 - 🏷️ **Vendor 100% offline** — database **OUI IEEE completo** (~40k vendor) via `npm run oui`: niente più "Unknown" anche senza internet.
@@ -368,27 +368,36 @@ NetworkScope è pensato come **strumento di monitoraggio della propria rete loca
 - **Best-effort**: vendor/DNS/UPnP/org falliscono in silenzio senza interrompere la scansione; cache su disco per vendor e stato.
 - **Scansione "educata"**: ciclo ARP silenzioso + sweep ICMP raro con jitter → poco rumore in rete.
 
+### 🔒 Token server-side (il segreto non finisce nel browser)
+Di default il frontend parla col backend tramite un **proxy same-origin** (`app/api/backend/[...path]`): il `NS_TOKEN` è letto **solo lato server** (variabile `NS_TOKEN`, **non** `NEXT_PUBLIC_*`) e iniettato nell'header verso il backend, quindi **non è mai incluso nel bundle JS** né visibile in DevTools. Configura:
+
+```bash
+# frontend (Next): backend da raggiungere + segreto server-side
+NS_BACKEND_URL=http://localhost:8000  NS_TOKEN=un-segreto-forte  npm run dev
+# backend: stesso segreto
+NS_TOKEN=un-segreto-forte  npm run backend
+# agente su un'altra macchina
+NS_TOKEN=un-segreto-forte  npm run agent -- --agent http://SERVER:8000
+```
+
+Il **terminale WebSocket** non usa più il token nell'URL: il frontend richiede un **ticket monouso a breve scadenza** (`POST /api/v1/ws-ticket`, 30s, one-shot) tramite il proxy autenticato e lo passa al WebSocket (`?ticket=…`). Così nemmeno la sessione del terminale espone il segreto.
+
+> Modalità **diretta legacy** (solo uso locale): impostando `NEXT_PUBLIC_API_URL` (+ `NEXT_PUBLIC_NS_TOKEN`) il browser parla direttamente col backend — comodo ma il token torna nel client. Preferisci il proxy per qualsiasi uso condiviso.
+
+### 🕶️ Modalità offline (nessun dato verso terzi)
+`NS_OFFLINE=1` sul backend **disattiva tutte le chiamate esterne** (geo/ASN via `ip-api.com` e VirusTotal): nessun IP delle tue destinazioni lascia la macchina. Le Impostazioni segnalano lo stato. Per contesti sensibili/aziendali.
+
 ### ⚠️ Cosa indurire PRIMA di un uso oltre la LAN fidata
 | Aspetto | Stato attuale | Mitigazione consigliata |
 |---|---|---|
-| **Autenticazione** | **token opzionale**: imposta `NS_TOKEN` sul server e `NEXT_PUBLIC_NS_TOKEN` sul frontend (stesso valore) → API, WebSocket e report degli agenti richiedono il token (header `x-ns-token` / query `?token=`). Non impostato = aperto (comodo in locale). | attivare `NS_TOKEN` per qualsiasi uso oltre `localhost` |
-| **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918); con `NS_TOKEN` attivo richiede anche il token | tenere il server su rete fidata + token |
+| **Autenticazione** | **token opzionale server-side**: `NS_TOKEN` sul backend + sul processo Next (proxy). API, WebSocket (via ticket) e report agenti richiedono il token. Non impostato = aperto (comodo in locale). | attivare `NS_TOKEN` per qualsiasi uso oltre `localhost` |
+| **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918); con `NS_TOKEN` attivo richiede un **ticket monouso** (o il token) | tenere il server su rete fidata + token |
 | **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN + token |
 | **Trasporto** | HTTP/WS in chiaro | mettere dietro reverse proxy con **HTTPS/WSS** |
-| **Lookup geo/ASN/org** | invia gli **IP di destinazione pubblici** a `ip-api.com` | disattivabile per restare 100% offline (vedi `lookupIpInfo` in `server.mjs`) |
-| **VirusTotal** | opzionale (`VT_API_KEY` o chiave impostata dalle **Impostazioni**, salvata in `.ns-config.json`): invia gli **IP pubblici** a VirusTotal per il check malevoli | non impostare la chiave se non vuoi consultare servizi esterni; `.ns-config.json` è in `.gitignore` |
+| **Lookup geo/ASN/org** | invia gli **IP di destinazione pubblici** a `ip-api.com` | `NS_OFFLINE=1` per restare 100% offline |
+| **VirusTotal** | opzionale (`VT_API_KEY` o chiave dalle **Impostazioni**, salvata in `.ns-config.json`): invia gli **IP pubblici** a VirusTotal | `NS_OFFLINE=1` per disattivarlo; `.ns-config.json` è in `.gitignore` |
 
-**Esempio con autenticazione:**
-```bash
-# backend (con auth + VirusTotal opzionale)
-NS_TOKEN=un-segreto-forte VT_API_KEY=la-tua-chiave-virustotal npm run backend
-# frontend
-NEXT_PUBLIC_NS_TOKEN=un-segreto-forte npm run dev
-# agente su un'altra macchina
-NS_TOKEN=un-segreto-forte npm run agent -- --agent http://SERVER:8000
-```
-
-> In sintesi: ottimo come tool personale/di laboratorio sulla **tua** rete. Per un uso condiviso/esposto attiva **`NS_TOKEN`** e metti **HTTPS/WSS** davanti.
+> In sintesi: ottimo come tool personale/di laboratorio sulla **tua** rete. Per un uso condiviso/esposto attiva **`NS_TOKEN`** (server-side via proxy), valuta **`NS_OFFLINE`** e metti **HTTPS/WSS** davanti.
 
 ---
 

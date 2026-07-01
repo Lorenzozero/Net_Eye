@@ -1,16 +1,42 @@
 import { Device, ScanResult, Agent } from '../types';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const NS_TOKEN = process.env.NEXT_PUBLIC_NS_TOKEN;
+// Modalità di default: proxy same-origin (/api/backend). Il token NS_TOKEN resta server-side
+// e NON viene mai incluso nel bundle client. Impostando NEXT_PUBLIC_API_URL si passa alla
+// modalità DIRETTA legacy (il browser parla col backend, token nel client — solo uso locale).
+const DIRECT_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const DIRECT_TOKEN = process.env.NEXT_PUBLIC_NS_TOKEN;
+export const API_URL = DIRECT_URL || '/api/backend';
 
-// Query string per il token sul WebSocket (usata dal terminale reale).
-export const WS_TOKEN_QS = NS_TOKEN ? `&token=${encodeURIComponent(NS_TOKEN)}` : '';
-
-// Wrapper fetch che aggiunge il token di autenticazione (se configurato).
+// Wrapper fetch. In modalità diretta aggiunge il token; in modalità proxy non serve
+// (lo inietta il route handler server-side).
 function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
     const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
-    if (NS_TOKEN) headers['x-ns-token'] = NS_TOKEN;
+    if (DIRECT_URL && DIRECT_TOKEN) headers['x-ns-token'] = DIRECT_TOKEN;
     return fetch(`${API_URL}${path}`, { ...options, headers });
+}
+
+// URL WebSocket del backend per il terminale reale. L'host NON è un segreto:
+// l'autenticazione avviene tramite un ticket monouso a breve scadenza (getWsTicket).
+export function wsUrl(): string {
+    if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+    if (DIRECT_URL) return DIRECT_URL.replace(/^http/, 'ws');
+    if (typeof window !== 'undefined') {
+        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        return `${proto}://${window.location.hostname}:8000`;
+    }
+    return 'ws://localhost:8000';
+}
+
+// Richiede un ticket monouso per aprire il WebSocket senza esporre il token.
+export async function getWsTicket(): Promise<string | null> {
+    try {
+        const r = await apiFetch('/api/v1/ws-ticket', { method: 'POST' });
+        if (!r.ok) return null;
+        const j = await r.json();
+        return j.ticket ?? null;
+    } catch {
+        return null;
+    }
 }
 
 export async function fetchDevices(): Promise<Device[]> {
@@ -107,7 +133,7 @@ export async function fetchConnections(): Promise<Connection[]> {
     return res.json();
 }
 
-export async function fetchConfig(): Promise<{ vtConfigured: boolean }> {
+export async function fetchConfig(): Promise<{ vtConfigured: boolean; offline?: boolean }> {
     const res = await apiFetch('/api/v1/config');
     if (!res.ok) throw new Error('Impossibile recuperare la configurazione');
     return res.json();

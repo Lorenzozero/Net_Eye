@@ -38,6 +38,29 @@ function authOk(req) {
   return t === TOKEN;
 }
 
+// Modalità offline: se NS_OFFLINE è attivo, NESSUN IP viene inviato a servizi terzi
+// (ip-api.com per geo/ASN, VirusTotal). Per contesti sensibili/aziendali.
+const OFFLINE = /^(1|true|yes|on)$/i.test(process.env.NS_OFFLINE || '');
+
+// Ticket WebSocket monouso e a breve scadenza: evita di esporre il token long-lived
+// nell'URL del terminale. Il frontend richiede un ticket via API (autenticata) e lo usa
+// una sola volta per aprire il WebSocket.
+const wsTickets = new Map(); // ticket -> scadenza (ms)
+function issueWsTicket() {
+  const now = Date.now();
+  for (const [t, exp] of wsTickets) if (exp < now) wsTickets.delete(t); // pulizia scaduti
+  const ticket = crypto.randomBytes(24).toString('hex');
+  wsTickets.set(ticket, now + 30_000); // valido 30s
+  return ticket;
+}
+function consumeWsTicket(ticket) {
+  if (!ticket) return false;
+  const exp = wsTickets.get(ticket);
+  if (exp === undefined) return false;
+  wsTickets.delete(ticket); // monouso
+  return exp >= Date.now();
+}
+
 // Identità agente persistente (stabile fra i riavvii). Override per test/multi-istanza con NS_AGENT_ID.
 const AGENT_ID_FILE = new URL('./.agent-id', import.meta.url);
 const AGENT_ID = process.env.NS_AGENT_ID || (() => {
@@ -109,7 +132,13 @@ function handleWsUpgrade(req, socket) {
   try {
   const { pathname, searchParams } = new URL(req.url, 'http://localhost');
   if (pathname !== '/api/v1/connect') { socket.destroy(); return; }
-  if (TOKEN && searchParams.get('token') !== TOKEN) { socket.destroy(); return; }
+  // Auth: quando è impostato NS_TOKEN, accetta un ticket monouso (preferito, non espone il
+  // token nel client) oppure il token diretto (retrocompatibilità).
+  if (TOKEN) {
+    const okTicket = consumeWsTicket(searchParams.get('ticket'));
+    const okToken = searchParams.get('token') === TOKEN;
+    if (!okTicket && !okToken) { socket.destroy(); return; }
+  }
   const ip = searchParams.get('ip');
   const port = Number(searchParams.get('port'));
   const key = req.headers['sec-websocket-key'];
@@ -881,6 +910,7 @@ async function reverseDnsT(ip) {
 
 // Geolocalizzazione + ASN + organizzazione/ISP per un IP pubblico (ip-api.com, gratuito, best-effort).
 function lookupIpInfo(ip) {
+  if (OFFLINE) return Promise.resolve(null); // nessun IP inviato a servizi terzi
   return new Promise((resolve) => {
     try {
       const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as,country,countryCode,city,lat,lon`, { timeout: 2000 }, (res) => {
@@ -942,7 +972,7 @@ function vtLookup(ip) {
   });
 }
 function checkVT(ip) {
-  if (!vtApiKey) return null;
+  if (OFFLINE || !vtApiKey) return null;
   if (vtCache.has(ip)) return vtCache.get(ip);
   if (!vtQueue.includes(ip)) { vtQueue.push(ip); runVtQueue(); }
   return null;
@@ -1153,9 +1183,15 @@ const server = createServer(async (req, res) => {
     return json(res, 200, [...localConns, ...remote].slice(0, 120));
   }
 
+  // Ticket monouso per aprire il terminale WebSocket senza esporre il token nel client.
+  // La rotta è già protetta da authOk (proxy server-side inietta il token).
+  if (req.method === 'POST' && pathname === '/api/v1/ws-ticket') {
+    return json(res, 200, { ticket: TOKEN ? issueWsTicket() : null, ttl: 30 });
+  }
+
   // Configurazione runtime (chiave VirusTotal) — impostabile dalle Impostazioni
   if (req.method === 'GET' && pathname === '/api/v1/config') {
-    return json(res, 200, { vtConfigured: !!vtApiKey });
+    return json(res, 200, { vtConfigured: !!vtApiKey, offline: OFFLINE });
   }
   if (req.method === 'POST' && pathname === '/api/v1/config') {
     let raw = '';
