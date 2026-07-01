@@ -6,7 +6,10 @@ import Layout from '@/components/Layout';
 import { useTheme } from '@/contexts/ThemeContext';
 import { fetchTraffic, fetchConnections, TrafficData, TrafficPoint, Connection } from '@/lib/api';
 import ConnectionModal from '@/components/ConnectionModal';
-import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe } from 'lucide-react';
+import TopTalkers from '@/components/TopTalkers';
+import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe, GitFork } from 'lucide-react';
+
+const TopFlowsGraph = dynamic(() => import('@/components/TopFlowsGraph'), { ssr: false });
 
 const TrafficAreaChart = dynamic(() => import('@/components/TrafficAreaChart'), {
     ssr: false,
@@ -113,6 +116,15 @@ export default function TrafficoPage() {
                     sub={totals ? `↓ ${fmtBytes(totals.bytesIn)} · ↑ ${fmtBytes(totals.bytesOut)}` : undefined} />
             </div>
 
+            {/* Top talkers: host · servizi · programmi (per numero di connessioni) */}
+            <div className="mb-8">
+                <div className="flex items-baseline justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Chi comunica di più</h3>
+                    <span className="text-xs text-gray-400">per numero di connessioni attive</span>
+                </div>
+                <TopTalkers connections={connections} onSelectHost={setSelConn} />
+            </div>
+
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10 mb-8">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Throughput (KB/s) — 🔵 download · 🟣 upload</h3>
                 <div className="h-[300px]">
@@ -180,6 +192,17 @@ export default function TrafficoPage() {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            {/* Grafo delle connessioni più frequenti (programma → host) */}
+            <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200/70 dark:border-white/10">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
+                    <GitFork className="w-5 h-5 mr-2 text-indigo-500" /> Connessioni più frequenti
+                </h3>
+                <p className="text-xs text-gray-400 mb-3">Quali programmi si connettono più spesso a quali host (spessore = numero di connessioni). Click per i dettagli.</p>
+                <div className="overflow-x-auto">
+                    <TopFlowsGraph connections={connections} onSelect={setSelConn} />
                 </div>
             </div>
 

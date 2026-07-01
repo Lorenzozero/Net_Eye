@@ -83,6 +83,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
 - 🔗 **Analisi flussi/connessioni avanzata** — connessioni reali con **protocollo**, **programma sorgente** (claude.exe, brave.exe…), **geolocalizzazione 🌍**, **ASN + organizzazione** (Cloudflare, Anthropic, Google…), rilevamento **porte trojan/worm** e **VirusTotal** per gli IP malevoli — in tabella e su **mappa dei flussi cliccabile**.
 - 🛑 **Rilevamento IP malevoli (VirusTotal)** — con `VT_API_KEY` ogni IP pubblico è verificato su VirusTotal; i flussi malevoli sono evidenziati e generano una **notifica** in cronologia.
+- 🏆 **Top talkers + grafo connessioni** — classifiche "chi comunica di più" per **host · servizi · programmi**, e un **grafo programma → host** delle connessioni più frequenti (es. `claude.exe → Anthropic`).
 - 🖱️ **Dettagli ovunque** — click su qualsiasi dispositivo (inventario, tabelle reti, **nodo della mappa**) apre il dettaglio completo; click su un flusso del traffico apre il dettaglio della connessione.
 - 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
@@ -416,6 +417,7 @@ NS_TOKEN=un-segreto-forte npm run agent -- --agent http://SERVER:8000
 - [x] 🐳 `docker-compose` frontend + backend con un comando
 - [x] 🌍 Flussi arricchiti: geolocalizzazione + ASN + **programma sorgente** (tasklist)
 - [x] 🗺️ **Mappa geografica dei flussi** (paese/città/coordinate su proiezione equirettangolare)
+- [x] 🏆 Top talkers (host/servizi/programmi) + grafo delle connessioni più frequenti
 - [x] 🛑 Integrazione **VirusTotal** (IP malevoli) + notifica automatica
 - [ ] 🔬 Deep packet inspection per-protocollo (richiede Npcap + privilegi)
 - [ ] 🧪 Test end-to-end (Playwright)
