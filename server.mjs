@@ -15,6 +15,11 @@ import os from 'node:os';
 import https from 'node:https';
 import crypto from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { checkToken, tokenFromRequest, createTicketStore } from './lib/server/auth.mjs';
+import { ttlOs, isRandomMac, isPrivateIp, parseArpTable, ouiVendor as ouiVendorLookup } from './lib/server/netparse.mjs';
+import { initGeo, lookupGeo, geoStatus } from './lib/server/geo.mjs';
+import { classifyFlow, dpiStatus } from './lib/server/dpi.mjs';
+import { startCapture, flowBytesFor, pcapStatus } from './lib/server/pcap.mjs';
 
 const PORT = 8000;
 const isWin = process.platform === 'win32';
@@ -32,34 +37,17 @@ const AGENT_MODE = !!AGENT_TARGET;
 // Autenticazione opzionale: se NS_TOKEN è impostato, API/WebSocket/agenti richiedono il token.
 // Non impostato = aperto (comodo in locale). Header "x-ns-token" oppure query "?token=".
 const TOKEN = process.env.NS_TOKEN || null;
-function authOk(req) {
-  if (!TOKEN) return true;
-  const t = req.headers['x-ns-token'] || new URL(req.url, 'http://x').searchParams.get('token');
-  return t === TOKEN;
-}
+function authOk(req) { return checkToken(TOKEN, tokenFromRequest(req)); }
 
 // Modalità offline: se NS_OFFLINE è attivo, NESSUN IP viene inviato a servizi terzi
 // (ip-api.com per geo/ASN, VirusTotal). Per contesti sensibili/aziendali.
 const OFFLINE = /^(1|true|yes|on)$/i.test(process.env.NS_OFFLINE || '');
 
-// Ticket WebSocket monouso e a breve scadenza: evita di esporre il token long-lived
-// nell'URL del terminale. Il frontend richiede un ticket via API (autenticata) e lo usa
-// una sola volta per aprire il WebSocket.
-const wsTickets = new Map(); // ticket -> scadenza (ms)
-function issueWsTicket() {
-  const now = Date.now();
-  for (const [t, exp] of wsTickets) if (exp < now) wsTickets.delete(t); // pulizia scaduti
-  const ticket = crypto.randomBytes(24).toString('hex');
-  wsTickets.set(ticket, now + 30_000); // valido 30s
-  return ticket;
-}
-function consumeWsTicket(ticket) {
-  if (!ticket) return false;
-  const exp = wsTickets.get(ticket);
-  if (exp === undefined) return false;
-  wsTickets.delete(ticket); // monouso
-  return exp >= Date.now();
-}
+// Ticket WebSocket monouso e a breve scadenza (store estratto in lib/server/auth.mjs):
+// evita di esporre il token long-lived nell'URL del terminale.
+const ticketStore = createTicketStore({ ttlMs: 30_000 });
+const issueWsTicket = () => ticketStore.issue();
+const consumeWsTicket = (t) => ticketStore.consume(t);
 
 // Identità agente persistente (stabile fra i riavvii). Override per test/multi-istanza con NS_AGENT_ID.
 const AGENT_ID_FILE = new URL('./.agent-id', import.meta.url);
@@ -78,9 +66,6 @@ const jitter = (ms) => Math.round(ms + (Math.random() - 0.5) * ms * 0.3); // ±1
 
 // ---- WebSocket ↔ TCP proxy (terminale REALE verso ip:port di un dispositivo) ----
 const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-const isPrivateIp = (ip) =>
-  /^10\./.test(ip) || /^192\.168\./.test(ip) || /^127\./.test(ip) || /^169\.254\./.test(ip) ||
-  /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
 
 function wsEncode(opcode, payload) {
   const len = payload.length;
@@ -127,10 +112,33 @@ function connectNote(port) {
   return notes[port] || null;
 }
 
+// Canale eventi WebSocket per il push in tempo reale (nuovi dispositivi, minacce…).
+const eventClients = new Set();
+function broadcastEvent(obj) {
+  if (!eventClients.size) return;
+  const msg = JSON.stringify(obj);
+  for (const s of eventClients) { try { wsSend(s, msg); } catch { /* client caduto */ } }
+}
+function handleEventsUpgrade(req, socket, searchParams) {
+  if (TOKEN) {
+    const ok = consumeWsTicket(searchParams.get('ticket')) || searchParams.get('token') === TOKEN;
+    if (!ok) { socket.destroy(); return; }
+  }
+  const key = req.headers['sec-websocket-key'];
+  if (!key) { socket.destroy(); return; }
+  const accept = crypto.createHash('sha1').update(key + WS_MAGIC).digest('base64');
+  socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' + `Sec-WebSocket-Accept: ${accept}\r\n\r\n`);
+  eventClients.add(socket);
+  wsSend(socket, JSON.stringify({ type: 'hello', ts: Date.now() }));
+  const onEnd = () => eventClients.delete(socket);
+  socket.on('close', onEnd); socket.on('error', onEnd);
+}
+
 // Gestisce un upgrade WebSocket → apre un socket TCP reale verso ip:port e fa da ponte bidirezionale.
 function handleWsUpgrade(req, socket) {
   try {
   const { pathname, searchParams } = new URL(req.url, 'http://localhost');
+  if (pathname === '/api/v1/events') { handleEventsUpgrade(req, socket, searchParams); return; }
   if (pathname !== '/api/v1/connect') { socket.destroy(); return; }
   // Auth: quando è impostato NS_TOKEN, accetta un ticket monouso (preferito, non espone il
   // token nel client) oppure il token diretto (retrocompatibilità).
@@ -394,37 +402,13 @@ async function ping(ip) {
   return { alive, ttl, rtt };
 }
 
-// TTL ricevuto → famiglia OS (su LAN gli hop sono ~0, quindi TTL ≈ valore iniziale).
-function ttlOs(ttl) {
-  if (!ttl) return null;
-  if (ttl <= 64) return 'Linux/Unix';     // anche Android/iOS/macOS
-  if (ttl <= 128) return 'Windows';
-  return 'Embedded/Network';               // router, stampanti, IoT (TTL 255)
-}
-
+// ttlOs, isRandomMac, parseArpTable, ouiVendor: importati da lib/server/netparse.mjs (testabili).
 async function arpTable() {
-  const out = await run('arp -a');
-  const map = {};
-  const re = /(\d+\.\d+\.\d+\.\d+)\s+([0-9a-f]{2}(?:[-:][0-9a-f]{2}){5})/gi;
-  let m;
-  while ((m = re.exec(out))) {
-    const mac = m[2].replace(/-/g, ':').toUpperCase();
-    if (mac !== 'FF:FF:FF:FF:FF:FF' && !mac.startsWith('01:00:5E') && !mac.startsWith('33:33')) map[m[1]] = mac;
-  }
-  return map;
-}
-
-// MAC localmente amministrato (randomizzato per privacy) → tipico di iPhone/Android.
-function isRandomMac(mac) {
-  if (!mac) return false;
-  const first = parseInt(mac.slice(0, 2), 16);
-  return Number.isFinite(first) && (first & 0x02) === 0x02 && (first & 0x01) === 0x00;
+  return parseArpTable(await run('arp -a'));
 }
 
 function ouiVendor(mac) {
-  if (!mac) return null;
-  const prefix = mac.replace(/[^0-9a-f]/gi, '').toUpperCase().slice(0, 6);
-  return OUI[prefix] || (OUI_DB ? OUI_DB[prefix] : null) || null;  // inline (nomi corti) → DB IEEE completo
+  return ouiVendorLookup(mac, OUI, OUI_DB);  // inline (nomi corti) → DB IEEE completo
 }
 
 function onlineVendor(mac) {
@@ -744,6 +728,8 @@ async function processLive(live, pingInfo, arp, upnpByIp, markOffline) {
   const liveKeys = new Set();
   const toEnrich = [];
   let newCount = 0;
+  const known = registry.size;   // se 0 = primo boot: niente burst di notifiche
+  const newDevs = [];
 
   for (const ip of live) {
     const mac = arp[ip] || (ip === local.ip ? local.mac : null);
@@ -755,6 +741,7 @@ async function processLive(live, pingInfo, arp, upnpByIp, markOffline) {
       dev = { first_seen: nowISO, seen_count: 0, enriched_at: 0, open_ports: [], banners: {}, upnp: null, vendor: 'Unknown', device_type: 'desktop', os: null };
       registry.set(key, dev);
       newCount++;
+      newDevs.push(dev);
     }
     dev.ip_address = ip;
     dev.mac_address = mac;
@@ -769,6 +756,17 @@ async function processLive(live, pingInfo, arp, upnpByIp, markOffline) {
 
   // Arricchimento SOLO per device nuovi o stale → cicli successivi molto più leggeri
   await mapLimit(toEnrich, 8, async ([dev, upnp]) => { await enrichDevice(dev, upnp); });
+
+  // Push in tempo reale dei nuovi dispositivi (dopo l'arricchimento, con vendor/tipo). Niente
+  // burst al primo boot (known === 0): quei device appaiono comunque nell'inventario.
+  if (known > 0 && newDevs.length && typeof broadcastEvent === 'function') {
+    for (const d of newDevs) {
+      broadcastEvent({ type: 'new-device', ts: Date.now(), device: {
+        ip: d.ip_address, mac: d.mac_address, vendor: d.vendor, device_type: d.device_type,
+        hostname: d.hostname || null, os: d.os || null,
+      } });
+    }
+  }
 
   // Marca offline + pruning solo dopo uno sweep ICMP completo (l'ARP da solo non è affidabile)
   if (markOffline) {
@@ -908,32 +906,11 @@ async function reverseDnsT(ip) {
   return Promise.race([reverseDns(ip), new Promise((r) => setTimeout(() => r(null), 1500))]);
 }
 
-// Geolocalizzazione + ASN + organizzazione/ISP per un IP pubblico (ip-api.com, gratuito, best-effort).
+// Geolocalizzazione + ASN + org. Delegata al modulo geo (MaxMind locale → fallback ip-api con
+// backoff). In modalità OFFLINE nessun IP lascia la macchina.
 function lookupIpInfo(ip) {
-  if (OFFLINE) return Promise.resolve(null); // nessun IP inviato a servizi terzi
-  return new Promise((resolve) => {
-    try {
-      const req = http.get(`http://ip-api.com/json/${ip}?fields=status,org,isp,as,country,countryCode,city,lat,lon`, { timeout: 2000 }, (res) => {
-        let b = '';
-        res.on('data', (c) => (b += c));
-        res.on('end', () => {
-          try {
-            const j = JSON.parse(b);
-            if (j.status !== 'success') return resolve(null);
-            const asMatch = (j.as || '').match(/^AS(\d+)\s*(.*)$/);
-            resolve({
-              org: j.org || j.isp || (asMatch ? asMatch[2] : null) || null,
-              asn: asMatch ? `AS${asMatch[1]}` : null,
-              country: j.country || null, countryCode: j.countryCode || null, city: j.city || null,
-              lat: typeof j.lat === 'number' ? j.lat : null, lon: typeof j.lon === 'number' ? j.lon : null,
-            });
-          } catch { resolve(null); }
-        });
-      });
-      req.on('error', () => resolve(null));
-      req.on('timeout', () => { req.destroy(); resolve(null); });
-    } catch { resolve(null); }
-  });
+  if (OFFLINE) return Promise.resolve(null);
+  return lookupGeo(ip);
 }
 
 // Mappa PID → nome processo (quale programma genera traffico). Windows via tasklist. Cache breve.
@@ -1035,7 +1012,16 @@ async function getConnections() {
     e.city = info?.city || null;
     e.lat = info?.lat ?? null;
     e.lon = info?.lon ?? null;
-    e.threat = THREAT_PORTS[e.remotePort] || null;
+    e.geoSource = info?.source || null;
+    // DPI: byte reali dalla cattura pacchetti (se attiva) → firma sul payload + classificazione.
+    const fb = flowBytesFor(e.remoteIp, e.remotePort);
+    const dpi = classifyFlow({ port: e.remotePort, localPort: Number(e.localIps?.[0] && 0), proto: e.proto.toLowerCase(), payload: fb?.sample });
+    if (dpi.service && dpi.service !== `porta ${e.remotePort}`) e.service = dpi.service;
+    e.protocolDesc = dpi.description || null;
+    e.inspected = dpi.inspected;      // true = riconosciuto dal payload reale (pcap)
+    e.bytes = fb?.bytes ?? null;      // byte reali osservati (null in modalità socket-table)
+    // Minaccia: porta trojan/worm nota (DB DPI) → fallback THREAT_PORTS legacy.
+    e.threat = (dpi.threat && `${dpi.threat.name} (${dpi.threat.kind})`) || THREAT_PORTS[e.remotePort] || null;
     const vt = e.scope === 'Internet' ? checkVT(e.remoteIp) : null;
     e.malicious = vt?.malicious || 0;
     e.vt = vt || null;
@@ -1189,6 +1175,11 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { ticket: TOKEN ? issueWsTicket() : null, ttl: 30 });
   }
 
+  // Capacità avanzate del backend (per le evidenze in frontend): cattura pacchetti, DPI, geo.
+  if (req.method === 'GET' && pathname === '/api/v1/capabilities') {
+    return json(res, 200, { pcap: pcapStatus(), dpi: dpiStatus(), geo: geoStatus(), offline: OFFLINE });
+  }
+
   // Configurazione runtime (chiave VirusTotal) — impostabile dalle Impostazioni
   if (req.method === 'GET' && pathname === '/api/v1/config') {
     return json(res, 200, { vtConfigured: !!vtApiKey, offline: OFFLINE });
@@ -1328,10 +1319,23 @@ async function reportToServer() {
   });
 }
 
+// Avvia le capacità avanzate: MaxMind (se presente) e cattura pacchetti reale (se Npcap/`cap`).
+function initCapabilities() {
+  initGeo().then((s) => console.log(`   🌍 geo: provider ${s.provider}${s.maxmind.city ? ' (MaxMind)' : ''}`)).catch(() => {});
+  if (OFFLINE) return;
+  const localIps = new Set();
+  try { for (const list of Object.values(os.networkInterfaces())) for (const ni of (list || [])) if (ni.family === 'IPv4') localIps.add(ni.address); } catch {}
+  const s = startCapture({ localIps });
+  console.log(s.active ? `   📡 cattura pacchetti REALE attiva su ${s.device}` : `   📡 cattura pacchetti non attiva: ${s.reason} (modalità socket-table)`);
+  const d = dpiStatus();
+  console.log(`   🔬 DPI: ${d.services} servizi, ${d.threats} minacce note${d.ianaLoaded ? ' (IANA)' : ''}`);
+}
+
 if (AGENT_MODE) {
   // ── MODALITÀ AGENTE: scansiona la rete locale e riporta a un server remoto ──
   console.log(`🛰️  NetworkScope AGENTE ${AGENT_ID} → riporta a ${AGENT_TARGET}`);
   startupLog();
+  initCapabilities();
   loadState();
   postJson(`${AGENT_TARGET}/api/v1/agents/register`, localAgentDescriptor());
   fullScan().then(reportToServer);
@@ -1344,6 +1348,7 @@ if (AGENT_MODE) {
   server.listen(PORT, () => {
     console.log(`🛰️  NetworkScope server su http://localhost:${PORT}  (agente locale ${AGENT_ID})`);
     startupLog();
+    initCapabilities();
     loadState();
     fullScan();
     startScanScheduler();                 // light (silenzioso) frequente + full raro, con jitter

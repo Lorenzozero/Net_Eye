@@ -82,6 +82,9 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🌙 **Dark / Light mode** — toggle in navbar che pilota davvero il tema (Tailwind v4 `@custom-variant`), persistente in localStorage.
 - 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
 - 🔗 **Analisi flussi/connessioni avanzata** — connessioni reali con **protocollo**, **programma sorgente** (claude.exe, brave.exe…), **geolocalizzazione 🌍**, **ASN + organizzazione** (Cloudflare, Anthropic, Google…), rilevamento **porte trojan/worm** e **VirusTotal** per gli IP malevoli — in tabella e su **mappa dei flussi cliccabile**.
+- 📡 **Cattura pacchetti REALE (Npcap/libpcap)** — modulo opzionale `lib/server/pcap.mjs`: con Npcap (Windows) o libpcap (Linux/macOS) + la dipendenza nativa `cap`, il backend vede i **byte effettivi per flusso** (non solo la socket table) e campiona i payload per la deep inspection. Se non disponibile, degrada in modo pulito alla modalità socket-table e lo **stato è mostrato in frontend**.
+- 🔬 **Deep Packet Inspection — 6000+ protocolli** — modulo `lib/server/dpi.mjs`: **6150 servizi** dal registro **IANA**, un **DB di porte trojan/worm/backdoor** note (Back Orifice, NetBus, SubSeven, Sasser…) e **firme sui payload reali** (HTTP, TLS, SSH, DNS, SMB, RDP…) quando la cattura pacchetti è attiva. Il flusso riconosciuto dal payload mostra il badge **DPI**.
+- 🗺️ **Geolocalizzazione MaxMind** — modulo `lib/server/geo.mjs`: usa i database locali **MaxMind GeoLite2** (`data/GeoLite2-City.mmdb` + `-ASN.mmdb`) se presenti — più affidabili e senza inviare IP a terzi; **fallback ip-api** con **coda a rate-limit + backoff esponenziale** (niente saturazione a cold start con molti agenti).
 - 🛑 **Rilevamento IP malevoli (VirusTotal)** — imposta la chiave API **direttamente dalle Impostazioni** (o via `VT_API_KEY`) e ogni IP pubblico è verificato su VirusTotal; i flussi malevoli sono evidenziati e generano una **notifica** in cronologia. La chiave è salvata solo in locale (`.ns-config.json`).
 - 🏆 **Top talkers + grafo connessioni** — classifiche "chi comunica di più" per **host · servizi · programmi**, e un **grafo dispositivo → programma → host** delle connessioni più frequenti (es. `PC-Lorenzo → claude.exe → Anthropic`).
 - 🌍 **Mappa geografica dei flussi** — **mappa mondiale reale** (confini veri dei paesi, GeoJSON Natural Earth) con oceani, **nomi dei continenti**, zoom/pan, città e paese di destinazione; i flussi mostrati provengono **solo dalle macchine monitorate** (server + agenti), non da tutti i dispositivi della rete.
@@ -89,7 +92,7 @@ La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio 
 - 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
 - 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
 - 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
-- 🔔 **Notifiche nuovi dispositivi + cronologia** — avviso in-app + notifica del browser quando compare un nuovo dispositivo; il **bell in navbar** apre la cronologia con **data e dettagli** e badge dei non letti.
+- 🔔 **Notifiche nuovi dispositivi in tempo reale** — **push via WebSocket** (`/api/v1/events`) appena un nuovo dispositivo compare (nessun ritardo), con **polling di riserva** a 15s; avviso in-app + notifica del browser; il **bell in navbar** apre la cronologia con **data e dettagli** e badge dei non letti.
 - 🔐 **Autenticazione a token opzionale (server-side)** — con `NS_TOKEN` API, WebSocket (via **ticket monouso**) e report degli agenti richiedono il token; il segreto resta lato server grazie a un **proxy same-origin** e non finisce nel bundle client. Non impostato = aperto per l'uso locale. Con `NS_OFFLINE=1` nessun dato va a servizi terzi.
 - 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
 - ⚡ **Scansione incrementale + persistenza** — cicli ~3× più veloci (arricchimento solo per device nuovi/stale), **storico** dispositivi salvato su disco e ripristinato al riavvio; **autostart** dello scanner al login senza admin.
@@ -361,6 +364,8 @@ Il frontend si aspetta queste rotte:
 | `DELETE` | `/api/v1/agents/:id` | Rimuove un agent |
 | `GET` | `/api/v1/traffic` | Serie temporale traffico reale (KB/s + pacchetti/s + totali) |
 | `GET` | `/api/v1/connections` | Connessioni attive: protocollo, sorgente, destinazione (reverse DNS) |
+| `GET` | `/api/v1/capabilities` | Stato dei motori: cattura pacchetti, DPI, geolocalizzazione |
+| `WS` | `/api/v1/events` | Push in tempo reale (nuovi dispositivi, eventi) |
 
 **Modello dati** (`types/index.ts`):
 
@@ -376,6 +381,32 @@ interface Device {
   device_type: string;   // gateway | router | server | mobile | printer | iot_device | ...
   open_ports: number[];
 }
+```
+
+---
+
+## 🧩 Capacità avanzate (opzionali)
+
+Il backend è organizzato in **moduli** (`lib/server/`) — `auth.mjs` (token + ticket WS), `netparse.mjs` (TTL/MAC/ARP/OUI), `dpi.mjs` (protocolli + minacce), `geo.mjs` (MaxMind + ip-api), `pcap.mjs` (cattura pacchetti). Le funzioni pure sono coperte da **test** (`npm test`). Ogni capacità funziona in modo **best-effort e degrada con eleganza**: la pagina **Traffico** mostra un pannello "Motore di analisi — evidenze" con lo stato reale di ciascun motore.
+
+### 📡 Cattura pacchetti reale (Npcap / libpcap)
+Per vedere i **byte effettivi per flusso** (non solo la socket table) e fare deep inspection sui payload:
+
+1. **Windows**: installa **[Npcap](https://npcap.com/)** (spunta *WinPcap API-compatible*). **Linux/macOS**: `libpcap` (spesso già presente; `apt install libpcap-dev` se serve compilare).
+2. Installa il binding nativo: `npm i cap`
+3. Avvia il backend **con privilegi** (Amministratore / `sudo`) — la cattura live richiede accesso raw all'interfaccia.
+
+Senza questi requisiti l'app resta in **modalità socket-table** (il pannello evidenze lo indica). È l'unica capacità che richiede privilegi: tutto il resto gira senza admin.
+
+### 🗺️ Geolocalizzazione MaxMind (più affidabile di ip-api)
+1. Crea un account gratuito **[MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)** e scarica `GeoLite2-City.mmdb` (opzionale: `GeoLite2-ASN.mmdb`).
+2. Mettili in `data/` e installa il reader: `npm i maxmind`
+3. Riavvia: il provider passa automaticamente a **MaxMind** (nessun IP inviato a terzi). Senza DB, fallback a **ip-api** con backoff.
+
+### 🔬 Deep Packet Inspection
+Il dataset dei 6000+ servizi (`data/iana-ports.json`) è generato dal registro IANA ed è rigenerabile:
+```bash
+node scripts/build-iana.mjs data/service-names-port-numbers.csv
 ```
 
 ---

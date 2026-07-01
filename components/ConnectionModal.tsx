@@ -10,6 +10,8 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
     </div>
 );
 
+const fmtBytes = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : b >= 1e3 ? `${(b / 1e3).toFixed(0)} KB` : `${b} B`);
+
 // Bandiera emoji dal codice paese ISO-2.
 const flag = (cc?: string | null) =>
     cc && cc.length === 2 ? cc.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0))) : '';
@@ -58,12 +60,18 @@ export default function ConnectionModal({ conn, onClose }: { conn: Connection; o
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <Field label="Servizio"><span className="text-indigo-600 dark:text-indigo-400 font-medium">{conn.service}</span></Field>
+                        <Field label="Servizio">
+                            <span className="text-indigo-600 dark:text-indigo-400 font-medium">{conn.service}</span>
+                            {conn.inspected && <span className="ml-1 text-[10px] align-middle rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1 py-0.5" title="Riconosciuto dal payload reale (deep packet inspection)">DPI</span>}
+                        </Field>
                         <Field label="Protocollo">{conn.proto}</Field>
+                        {conn.protocolDesc && <Field label="Descrizione IANA"><span className="text-xs">{conn.protocolDesc}</span></Field>}
+                        {typeof conn.bytes === 'number' && conn.bytes > 0 && <Field label="Byte reali (pcap)">{fmtBytes(conn.bytes)}</Field>}
                         <Field label="IP destinazione"><span className="font-mono">{conn.remoteIp}:{conn.remotePort}</span></Field>
                         <Field label="Ambito"><span className={conn.scope === 'LAN' ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}>{conn.scope}</span></Field>
                         {conn.process && <Field label="Programma">{conn.process}</Field>}
                         <Field label="Connessioni">{conn.count}</Field>
+                        {conn.geoSource && <Field label="Fonte geo">{conn.geoSource === 'maxmind' ? 'MaxMind' : 'ip-api'}</Field>}
                         {conn.org && <Field label="Organizzazione"><span className="break-all">{conn.org}</span></Field>}
                         {conn.asn && <Field label="ASN">{conn.asn}</Field>}
                         {(conn.country || conn.city) && <Field label="Località">{flag(conn.countryCode)} {[conn.city, conn.country].filter(Boolean).join(', ')}</Field>}

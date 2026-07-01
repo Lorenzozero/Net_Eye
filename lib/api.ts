@@ -125,6 +125,23 @@ export interface Connection {
     scope: 'LAN' | 'Internet';
     localIps: string[];
     fromHost: string;
+    bytes?: number | null;        // byte reali osservati (cattura pacchetti); null in socket-table
+    protocolDesc?: string | null; // descrizione IANA del protocollo
+    inspected?: boolean;          // true = riconosciuto dal payload reale (DPI su pcap)
+    geoSource?: string | null;    // 'maxmind' | 'ip-api'
+}
+
+export interface Capabilities {
+    pcap: { available: boolean; active: boolean; device: string | null; packets: number; bytes: number; flows: number; reason: string };
+    dpi: { services: number; threats: number; payloadSignatures: number; ianaLoaded: boolean };
+    geo: { provider: string; maxmind: { city: boolean; asn: boolean }; queue: number; backoffMs: number; cached: number };
+    offline: boolean;
+}
+
+export async function fetchCapabilities(): Promise<Capabilities> {
+    const res = await apiFetch('/api/v1/capabilities');
+    if (!res.ok) throw new Error('Impossibile recuperare le capacità');
+    return res.json();
 }
 
 export async function fetchConnections(): Promise<Connection[]> {

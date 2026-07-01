@@ -48,6 +48,10 @@ backend.log
 .agent-id
 .ns-config.json
 
+# database MaxMind GeoLite2 (licenza propria, scaricabili a parte) e CSV temporanei
+data/*.mmdb
+data/*.csv
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -7,6 +7,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { fetchTraffic, fetchConnections, TrafficData, TrafficPoint, Connection } from '@/lib/api';
 import ConnectionModal from '@/components/ConnectionModal';
 import TopTalkers from '@/components/TopTalkers';
+import CapabilitiesPanel from '@/components/CapabilitiesPanel';
 import { ArrowDown, ArrowUp, Activity, Database, AlertTriangle, Network, Globe, GitFork, Info } from 'lucide-react';
 
 const TopFlowsGraph = dynamic(() => import('@/components/TopFlowsGraph'), { ssr: false });
@@ -117,6 +118,8 @@ export default function TrafficoPage() {
                     </div>
                 );
             })()}
+
+            <CapabilitiesPanel />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                 <Stat icon={<ArrowDown className="w-6 h-6 text-sky-600 dark:text-sky-400" />} color="bg-sky-50 dark:bg-sky-900/20"
