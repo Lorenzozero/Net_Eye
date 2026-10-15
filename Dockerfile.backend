@@ -1,17 +1,25 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
+# Base Debian (non Alpine): dsniff/iptables non sono disponibili per aarch64 su Alpine,
+# mentre su Debian (bookworm) sono pacchetti apt stabili e multi-arch (ARM incluso, es. Raspberry Pi).
+#
 # Strumenti di rete usati dallo scanner (ping, arp, netstat) + runtime libpcap per la cattura pacchetti
 # + dsniff (arpspoof) e iptables per il Metodo 2 (ARP Redirection / MITM, vedi scripts/arp_redirect.sh)
-RUN apk add --no-cache iputils net-tools iproute2 libpcap dsniff iptables bash
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      iputils-ping net-tools iproute2 libpcap0.8 dsniff iptables bash ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Dipendenze native del backend: `cap` (binding libpcap) e `maxmind` (reader GeoLite2).
-# I tool di build (build-base, libpcap-dev, python3, linux-headers) servono solo a compilare
+# I tool di build (build-essential, libpcap-dev, python3) servono solo a compilare
 # `cap` e vengono rimossi subito dopo per tenere l'immagine leggera.
-RUN apk add --no-cache --virtual .build build-base libpcap-dev linux-headers python3 \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential libpcap-dev python3 \
  && npm install --no-save --no-package-lock cap@^0.2.1 maxmind@^5.0.6 \
- && apk del .build
+ && apt-get purge -y --auto-remove build-essential libpcap-dev python3 \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY server.mjs mock-api.mjs ./
 COPY lib ./lib
