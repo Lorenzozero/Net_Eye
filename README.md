@@ -286,3 +286,98 @@ Distribuito con licenza **MIT**. Consulta il file `LICENSE` per ulteriori dettag
 <br/>
 <sub>Sviluppato con ⚛️ Next.js, ❤️ e una sana curiosità verso i pacchetti che transitano sulla rete.</sub>
 </div>
+## 📚 Teoria di ARP Redirection (MITM)
+
+L'ARP (Address Resolution Protocol) è il meccanismo con cui un host traduce un indirizzo IP in un MAC address sulla LAN. Uno **spoofing ARP** consiste nell'inviare risposte ARP fasulle, facendo credere alla vittima che l'indirizzo MAC del router sia quello dell'attaccante. Così il traffico della vittima viene inviato all'attaccante, che può poi:
+
+1. **Forwardarlo** verso il router (o verso un altro host) usando NAT, in modo da non interrompere la connettività.
+2. **Analizzarlo** (DPI, logging, ecc.) prima di inoltrarlo.
+
+Il processo tipico è:
+- Abilitare l'IP forwarding sul host attaccante.
+- Aggiungere regole `iptables` per fare NAT del traffico della vittima.
+- Lanciare `arpspoof` in due direzioni:
+  - Vittima → router (finto ARP del router)
+  - Router → vittima (finto ARP della vittima)
+- Attendere (script idle) fino a interruzione, poi pulire.
+
+Questo metodo non richiede alcuna modifica al router e può essere attivato/disattivato rapidamente, rendendolo ideale per **test di sicurezza** o per **monitorare un singolo dispositivo** nella rete domestica.
+
+> **Nota**: è necessario operare con privilegi `root` su Linux/WSL. Su Windows nativo servirebbe un tool equivalente (es. `winpcap` + `arp -s`), ma per ora il nostro script è pensato per ambienti Linux.
+
+## ⚙️ Metodo 2 – ARP Redirection (MITM)
+
+**Scopo**: catturare il traffico di un dispositivo specifico della LAN reindirizzandolo verso il backend di NetworkScope tramite spoofing ARP. Questo metodo non richiede modifiche al router e può essere avviato e fermato a piacere.
+
+### Prerequisiti
+- Sistema Linux (o WSL) con privilegi `sudo`.
+- Pacchetto `arpspoof` (parte di `dsniff`). Installabile con `sudo apt install dsniff` su Debian/Ubuntu.
+- IP forwarding abilitato (lo script lo abilita automaticamente).
+- Il backend di NetworkScope in ascolto sulla porta 8000 (o altra porta specificata).
+
+### Uso
+```bash
+sudo ./scripts/arp_redirect.sh <IP_VITTIMA> <IP_ROUTER> [PORTA_BACKEND]
+```
+- `<IP_VITTIMA>`: l'indirizzo IP del dispositivo di cui vuoi monitorare il traffico.
+- `<IP_ROUTER>`: l'indirizzo IP del gateway della tua LAN.
+- `[PORTA_BACKEND]` (opzionale): porta su cui è in ascolto il backend (default 8000).
+
+Lo script:
+1. Abilita l'IP forwarding.
+2. Configura regole `iptables` per il NAT.
+3. Avvia `arpspoof` in entrambe le direzioni (vittima → router e router → vittima).
+4. Mantiene il MITM attivo finché non premi `Ctrl+C`, a quel punto pulisce le regole e ripristina lo stato iniziale.
+
+### Sicurezza
+- **Solo per reti di prova o reti di tua proprietà.** L'uso non autorizzato è illegale.
+- Lo script non modifica la configurazione del router; tutti i cambiamenti sono temporanei e revocabili al termine.
+- Per fermare l'intercettazione, premi `Ctrl+C`; lo script rimuoverà le regole `iptables` e disabiliterà l'IP forwarding.
+
+### Integrazione con NetworkScope
+Una volta avviato lo script, il backend di NetworkScope riceverà il traffico del dispositivo vittima attraverso la normale interfaccia di rete e potrà analizzarlo come se fosse il traffico della macchina locale. Puoi quindi utilizzare le funzionalità di monitoraggio del flusso, DPI e visualizzazione già presenti nell'app.
+
+---
+
+## 🍓 Deploy su Raspberry Pi
+
+NetworkScope è pensato per girare 24/7 su un Raspberry Pi come sonda di rete permanente (Docker + `network_mode: host`, nativo su Linux).
+
+### Prerequisiti
+- Raspberry Pi 3/4/5 con **Raspberry Pi OS (64-bit consigliato)**.
+- Accesso SSH o terminale locale.
+- Il Pi collegato alla stessa LAN che vuoi monitorare (via cavo per stabilità, consigliato).
+
+### Deploy automatico
+```bash
+git clone <url-del-repo> networkscope   # o copia la cartella sul Pi (scp/rsync)
+cd networkscope
+chmod +x scripts/deploy-raspberrypi.sh
+./scripts/deploy-raspberrypi.sh
+```
+
+Lo script [`scripts/deploy-raspberrypi.sh`](scripts/deploy-raspberrypi.sh):
+1. Installa Docker + plugin Compose se mancanti.
+2. Abilita il servizio Docker al boot (`systemctl enable docker`).
+3. Builda e avvia i container con `docker compose up --build -d`.
+
+Il Dockerfile del backend include già `dsniff` (per `arpspoof`) e `iptables`, necessari per il **Metodo 2 – ARP Redirection** descritto sopra, oltre a `libpcap` per la cattura pacchetti reale.
+
+### Autostart dopo reboot
+`restart: unless-stopped` nel `docker-compose.yml` + `docker` abilitato come servizio systemd bastano: il Pi riparte, Docker riparte, i container ripartono — nessuna configurazione aggiuntiva.
+
+### Aggiornare dopo un cambiamento
+```bash
+git pull
+docker compose up --build -d
+```
+
+### Note specifiche Pi
+- La build nativa del modulo `cap` (binding libpcap) richiede compilazione: la prima build può richiedere qualche minuto in più rispetto a un PC (già gestito dallo script/Dockerfile, non serve azione manuale).
+- Per il Metodo 2 (ARP Redirection) via Docker sul Pi, entra nel container ed esegui lo script lì dentro (ha già i binari e le capability `NET_ADMIN`/`NET_RAW`):
+  ```bash
+  docker compose exec backend sh -c "./scripts/arp_redirect.sh <victim_ip> <router_ip>"
+  ```
+- Monitora temperatura/throughput su Pi 3 se analizzi reti molto cariche; su Pi 4/5 non è un problema in condizioni normali.
+
+---

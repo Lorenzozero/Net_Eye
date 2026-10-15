@@ -1,7 +1,8 @@
 FROM node:20-alpine
 
 # Strumenti di rete usati dallo scanner (ping, arp, netstat) + runtime libpcap per la cattura pacchetti
-RUN apk add --no-cache iputils net-tools iproute2 libpcap
+# + dsniff (arpspoof) e iptables per il Metodo 2 (ARP Redirection / MITM, vedi scripts/arp_redirect.sh)
+RUN apk add --no-cache iputils net-tools iproute2 libpcap dsniff iptables bash
 
 WORKDIR /app
 
@@ -16,6 +17,8 @@ COPY server.mjs mock-api.mjs ./
 COPY lib ./lib
 COPY data ./data
 COPY agent ./agent
+COPY scripts ./scripts
+RUN chmod +x ./scripts/*.sh 2>/dev/null || true
 # oui-db.json opzionale: montalo o genera con "npm run oui" e copialo qui
 
 EXPOSE 8000
