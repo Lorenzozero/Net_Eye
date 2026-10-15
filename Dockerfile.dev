@@ -4,7 +4,10 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 
-RUN npm install
+# --ignore-scripts: salta la build nativa di `cap` (binding libpcap, serve solo a
+# server.mjs/backend, mai importato dal frontend) — evita di dover installare
+# toolchain Python/gcc qui solo per compilare un modulo che non viene usato.
+RUN npm install --ignore-scripts
 
 COPY . .
 
