@@ -1,10 +1,10 @@
 <div align="center">
 
-# 👁️ NetworkScope
+# 👁️ NetworkScope (`Net_Eye`)
 
-### _La tua rete, finalmente sotto controllo._
+### _La tua rete locale, finalmente sotto controllo._
 
-**Dashboard di monitoraggio rete in tempo reale — scoperta dispositivi, scansione porte e topologia interattiva in stile Packet Tracer.**
+**Dashboard di monitoraggio rete in tempo reale — scoperta dispositivi, scansione porte, analisi flussi e topologia interattiva in stile Packet Tracer.**
 
 <br/>
 
@@ -15,6 +15,7 @@
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 ![Status](https://img.shields.io/badge/status-MVP%20attivo-success?style=flat-square)
+![Zero External Deps Backend](https://img.shields.io/badge/backend-zero%20deps-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![PRs](https://img.shields.io/badge/PRs-welcome-orange?style=flat-square)
 ![Dark Mode](https://img.shields.io/badge/dark%20mode-🌙%20sì-1f2937?style=flat-square)
@@ -23,241 +24,21 @@
 
 ---
 
-## 📖 Indice
+## ⚡ Avvio Rapido (Quick Start)
 
-- [✨ Perché NetworkScope](#-perché-networkscope)
-- [🎯 A chi serve](#-a-chi-serve-target)
-- [🚀 Funzionalità](#-funzionalità)
-- [🖼️ Le 4 schermate](#️-le-4-schermate)
-- [🏗️ Architettura](#️-architettura)
-- [🔬 Tecniche di monitoraggio](#-tecniche-di-monitoraggio)
-- [🧰 Stack tecnico](#-stack-tecnico)
-- [⚡ Avvio rapido](#-avvio-rapido)
-- [🧪 Come testare dalla GUI web](#-come-testare-dalla-gui-web)
-- [🐳 Avvio con Docker](#-avvio-con-docker)
-- [🔌 Backend & API](#-backend--api)
-- [🔐 Sicurezza & note di produzione](#-sicurezza--note-di-produzione)
-- [🗺️ Roadmap](#️-roadmap)
-- [📜 Licenza](#-licenza)
+Avvia l'intero stack (frontend + backend di scansione reale) in **meno di un minuto**:
 
----
+### Opzione A: Con Docker (Consigliata)
+```bash
+# Avvia frontend (porta 3000) e backend di scansione (porta 8000)
+docker compose up --build
 
-## ✨ Perché NetworkScope
-
-> _"Conosci ogni dispositivo che respira sulla tua rete — prima che lo faccia qualcun altro."_
-
-La maggior parte delle persone non ha **idea** di cosa sia collegato al proprio router. Telecamere IoT cinesi, vecchi telefoni, NAS dimenticati con la porta 445 spalancata... 🫠
-
-**NetworkScope** trasforma quel caos in una **dashboard chiara, viva e bellissima**:
-
-| Senza NetworkScope 😵 | Con NetworkScope 😎 |
-|---|---|
-| `arp -a` in un terminale nero | Topologia interattiva drag & drop |
-| "Boh, c'è qualcosa su `.47`" | Hostname, vendor, porte, stato — in un click |
-| Zero alert di sicurezza | Conteggio automatico delle anomalie |
-| Tool brutti anni '90 | UI moderna, dark mode, responsive |
-
----
-
-## 🎯 A chi serve (Target)
-
-| 👤 Profilo | 💡 Caso d'uso |
-|---|---|
-| 🏠 **Home lab & smart home** | Tieni d'occhio IoT, NAS, console e ospiti sulla Wi-Fi |
-| 🛡️ **Studenti di sicurezza / CTF** | Visualizza scansioni, porte aperte e mappa di rete |
-| 🧑‍💻 **Sysadmin di PMI** | Inventario dispositivi e monitoraggio veloce senza tool pesanti |
-| 🎓 **Didattica networking** | Topologia "Packet Tracer-style" per spiegare reti reali |
-
----
-
-## 🚀 Funzionalità
-
-- 📊 **Dashboard live** — dispositivi totali, online, reti monitorate e avvisi di sicurezza, con refresh automatico ogni 10s.
-- 🗺️ **Topologia interattiva** — nodi trascinabili, zoom con rotella, pan, gateway evidenziato e pannello dettagli per dispositivo (`TopologyMap`, SVG puro, zero librerie pesanti).
-- 🔍 **Scansione rete & porte REALE** — il backend incluso fa ping-sweep della subnet, legge l'ARP, risolve hostname/vendor e scansiona le porte TCP dei dispositivi veri.
-- 🧠 **Identificazione intelligente** — riconosce telefoni (iPhone/Android, anche con MAC randomizzato), access point, NAS, stampanti, camere IP, **inverter FV**, **colonnine EV**, container Docker, smart TV e IoT, con OS e vendor.
-- 📇 **Inventario dispositivi** — tabella ricercabile per IP / hostname / vendor, modale di dettaglio con porte aperte.
-- 🧩 **Raggruppamento per subnet** — i dispositivi vengono aggregati automaticamente per rete `/24`, con rinomina inline.
-- 🤖 **Gestione Agent** — scarica installer (Windows `.bat`, Linux `.sh`, Python) e monitora gli agent registrati.
-- 🌙 **Dark / Light mode** — toggle in navbar che pilota davvero il tema (Tailwind v4 `@custom-variant`), persistente in localStorage.
-- 📈 **Traffico di rete REALE** — throughput download/upload (KB/s, MB/s) e **pacchetti/s** letti dai contatori dell'interfaccia, aggiornati ogni 2s, con grafici live e totali trasferiti.
-- 🔗 **Analisi flussi/connessioni avanzata** — connessioni reali con **protocollo**, **programma sorgente** (claude.exe, brave.exe…), **geolocalizzazione 🌍**, **ASN + organizzazione** (Cloudflare, Anthropic, Google…), rilevamento **porte trojan/worm** e **VirusTotal** per gli IP malevoli — in tabella e su **mappa dei flussi cliccabile**.
-- 📡 **Cattura pacchetti REALE (Npcap/libpcap)** — modulo opzionale `lib/server/pcap.mjs`: con Npcap (Windows) o libpcap (Linux/macOS) + la dipendenza nativa `cap`, il backend vede i **byte effettivi per flusso** (non solo la socket table) e campiona i payload per la deep inspection. Se non disponibile, degrada in modo pulito alla modalità socket-table e lo **stato è mostrato in frontend**.
-- 🔬 **Deep Packet Inspection — 6000+ protocolli** — modulo `lib/server/dpi.mjs`: **6150 servizi** dal registro **IANA**, un **DB di porte trojan/worm/backdoor** note (Back Orifice, NetBus, SubSeven, Sasser…) e **firme sui payload reali** (HTTP, TLS, SSH, DNS, SMB, RDP…) quando la cattura pacchetti è attiva. Il flusso riconosciuto dal payload mostra il badge **DPI**.
-- 🗺️ **Geolocalizzazione MaxMind** — modulo `lib/server/geo.mjs`: usa i database locali **MaxMind GeoLite2** (`data/GeoLite2-City.mmdb` + `-ASN.mmdb`) se presenti — più affidabili e senza inviare IP a terzi; **fallback ip-api** con **coda a rate-limit + backoff esponenziale** (niente saturazione a cold start con molti agenti).
-- 🛑 **Rilevamento IP malevoli (VirusTotal)** — imposta la chiave API **direttamente dalle Impostazioni** (o via `VT_API_KEY`) e ogni IP pubblico è verificato su VirusTotal; i flussi malevoli sono evidenziati e generano una **notifica** in cronologia. La chiave è salvata solo in locale (`.ns-config.json`).
-- 🏆 **Top talkers + grafo connessioni** — classifiche "chi comunica di più" per **host · servizi · programmi**, e un **grafo dispositivo → programma → host** delle connessioni più frequenti (es. `PC-Lorenzo → claude.exe → Anthropic`).
-- 🌍 **Mappa geografica dei flussi** — **mappa mondiale reale** (confini veri dei paesi, GeoJSON Natural Earth) con oceani, **nomi dei continenti**, zoom/pan, città e paese di destinazione; i flussi mostrati provengono **solo dalle macchine monitorate** (server + agenti), non da tutti i dispositivi della rete.
-- 🖱️ **Dettagli ovunque** — click su qualsiasi dispositivo (inventario, tabelle reti, **nodo della mappa**) apre il dettaglio completo; click su un flusso del traffico apre il dettaglio della connessione.
-- 🔌 **Connessione REALE per porta** — ogni porta aperta ha un pulsante: le porte web aprono il **browser**, le altre un **terminale interattivo reale** (socket TCP via proxy WebSocket nel server) per parlare davvero col servizio (HTTP, Telnet, Redis, SMTP, FTP…); per i client dedicati (ssh/rdp) c'è il comando pronto da copiare.
-- 🖱️ **Card KPI cliccabili** — Dispositivi/Online(→offline)/Reti/Avvisi aprono un modale con dettagli ed **evidenze**.
-- 🔄 **Refresh + stato agenti** — pulsante in navbar che ricarica i dati da tutte le pagine e una **spia 🟢/🔴** che segnala se lo scanner/agente è attivo.
-- 🔔 **Notifiche nuovi dispositivi in tempo reale** — **push via WebSocket** (`/api/v1/events`) appena un nuovo dispositivo compare (nessun ritardo), con **polling di riserva** a 15s; avviso in-app + notifica del browser; il **bell in navbar** apre la cronologia con **data e dettagli** e badge dei non letti.
-- 🔐 **Autenticazione a token opzionale (server-side)** — con `NS_TOKEN` API, WebSocket (via **ticket monouso**) e report degli agenti richiedono il token; il segreto resta lato server grazie a un **proxy same-origin** e non finisce nel bundle client. Non impostato = aperto per l'uso locale. Con `NS_OFFLINE=1` nessun dato va a servizi terzi.
-- 🧬 **Fingerprint avanzato** — OS da **TTL**, **latenza RTT**, **banner grabbing** (SSH/HTTP/cert TLS), **SSDP/UPnP** (nome/modello), **security risk score** per dispositivo.
-- ⚡ **Scansione incrementale + persistenza** — cicli ~3× più veloci (arricchimento solo per device nuovi/stale), **storico** dispositivi salvato su disco e ripristinato al riavvio; **autostart** dello scanner al login senza admin.
-- 🏷️ **Vendor 100% offline** — database **OUI IEEE completo** (~40k vendor) via `npm run oui`: niente più "Unknown" anche senza internet.
-- 📤 **Export CSV / PDF** — esporta l'inventario completo (IP, MAC, vendor, tipo, OS, porte, rischio) dalla pagina Dispositivi.
-
----
-
-## 🖼️ Le schermate
-
-<table>
-  <tr>
-    <td width="50%"><img src="assets/home.png" alt="Dashboard — KPI, topologia di rete e traffico live" /></td>
-    <td width="50%"><img src="assets/traffico.png" alt="Traffico — mappa dei flussi, dettaglio flusso e connessioni" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>🏠 Dashboard</b><br/>KPI, topologia di rete con dettaglio dispositivo e traffico in tempo reale</td>
-    <td align="center"><b>📈 Traffico</b><br/>Mappa dei flussi, dettaglio connessione (sorgente → destinazione, ASN, servizio) e tabella</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="assets/dispositivi.png" alt="Dispositivi — inventario e terminale SSH reale" /></td>
-    <td width="50%" valign="top">
-      <br/>
-      <b>📇 Dispositivi + 🖥️ Terminale reale</b><br/>
-      Inventario completo con dettagli di sicurezza e, per ogni porta aperta, un
-      <b>terminale interattivo reale</b> (qui una sessione <code>SSH</code> verso un Raspberry Pi
-      con banner OpenSSH reale). Le altre schermate — <b>🗺️ Mappa</b> topologica a schermo
-      intero e <b>⚙️ Impostazioni</b> — completano l'app.
-    </td>
-  </tr>
-</table>
-
-| Rotta | Pagina | Cosa fa |
-|---|---|---|
-| `/` | 🏠 **Dashboard** | Hub: KPI, topologia compatta, traffico, azioni rapide |
-| `/dispositivi` | 📇 **Dispositivi** | Inventario completo con ricerca e dettagli di sicurezza |
-| `/mappa` | 🗺️ **Mappa** | Topologia a schermo intero, interattiva |
-| `/traffico` | 📈 **Traffico** | Throughput e **pacchetti/s in tempo reale**, totali, **mappa dei flussi** + **mappa geografica** (paese/città), connessioni con programma/ASN/VirusTotal |
-| `/impostazioni` | ⚙️ **Impostazioni** | Agent, download installer, tema, notifiche, **chiave API VirusTotal** |
-
----
-
-## 🏗️ Architettura
-
+# Con autenticazione token abilitata:
+NS_TOKEN=un-segreto-forte docker compose up --build
 ```
-🌐 Browser
-   │  (polling 10–15s)
-   ▼
-⚛️ Next.js 16 · App Router  ──►  RootLayout → Providers → ThemeContext
-   │
-   ├─ 🏠 /             ┐
-   ├─ 📇 /dispositivi  │  Pagine "use client"
-   ├─ 🗺️ /mappa        │
-   └─ ⚙️ /impostazioni ┘
-        │
-        ▼
-🧩 Componenti UI · TopologyMap · DeviceList · NetworkGroup · TrafficChart · Layout
-        │
-        ▼
-🔗 lib/api.ts  +  types/index.ts   (unico punto di integrazione dati)
-        │
-        ▼
-🟩 Backend REALE · server.mjs · http://localhost:8000
-   (ping-sweep · arp · reverse DNS · OUI · port scan)
-        │
-        ▼
-🌐 La tua rete locale (x.y.z.0/24)
-```
+> 💡 *Nota*: su Linux Docker usa `network_mode: host` per scansionare direttamente la LAN reale.
 
-> 💡 **Nota:** il cuore è il frontend Next.js, ma il repo include anche un **backend di scansione reale** ([`server.mjs`](server.mjs), zero dipendenze) che popola la dashboard con i dispositivi veri della tua LAN, più un **mock** ([`mock-api.mjs`](mock-api.mjs)) per la demo offline. Base API configurabile via `NEXT_PUBLIC_API_URL`. Vedi [Come testare](#-come-testare-dalla-gui-web).
-
----
-
-## 🔬 Tecniche di monitoraggio
-
-Tutte le tecniche sono **attive e reali**, implementate in `server.mjs` con i soli strumenti del sistema operativo — **zero dipendenze esterne e nessun privilegio di amministratore**.
-
-### 🔎 Scoperta dei dispositivi
-| Tecnica | Strumento | Cosa rileva |
-|---|---|---|
-| **ICMP ping-sweep** | `ping` su tutta la `/24` (a batch paralleli) | host attivi e raggiungibili |
-| **Lettura tabella ARP** | `arp -a` | MAC address dei dispositivi nella LAN |
-| **Re-scan automatico** | loop ogni 60s | comparsa/scomparsa dispositivi nel tempo |
-
-### 🧠 Identificazione e fingerprinting
-| Tecnica | Come funziona | Cosa rivela |
-|---|---|---|
-| **OS fingerprint via TTL** | analisi del TTL della risposta ICMP (64→Linux, 128→Windows, 255→embedded) | famiglia di sistema operativo |
-| **Latenza RTT** | tempo di risposta del ping | reattività/qualità del link |
-| **TCP connect scan** | apertura socket su porte note (set rapido + set profondo on-demand) | porte e servizi aperti |
-| **Banner grabbing** | lettura della banner su SSH/FTP/SMTP, header `Server:` HTTP, **certificato TLS** | servizio e **versione** reali (es. `OpenSSH 10.0`, `nginx`, CN del certificato) |
-| **Discovery SSDP/UPnP** | M-SEARCH multicast su `239.255.255.250:1900` + parsing dell'XML di descrizione | **nome, modello e produttore** (TV, router, NAS, media) |
-| **Risoluzione hostname** | reverse DNS → **NetBIOS** (`nbtstat`) → nome UPnP | nome host leggibile |
-| **Vendor via OUI** | tabella inline + **DB IEEE completo offline** (~40k) + lookup online throttolato e cachato | produttore della scheda di rete |
-| **MAC randomizzato** | rilevamento del bit *locally-administered* | smartphone con MAC privacy (iPhone/Android) |
-| **Classificazione tipo** | euristica combinata su porte + vendor + MAC + banner + UPnP + TTL | telefono, AP, NAS, stampante, camera, inverter, EV, Docker, IoT… |
-
-### 📈 Monitoraggio del traffico
-| Tecnica | Strumento | Cosa misura |
-|---|---|---|
-| **Contatori d'interfaccia** | `netstat -e` (Windows) · `/proc/net/dev` (Linux), campionati ogni 2s | **throughput** download/upload (KB/s–MB/s) e **pacchetti/s** in/out |
-| **Totali cumulativi** | delta dei contatori | byte e pacchetti totali trasferiti |
-
-### 🔗 Analisi dei flussi/connessioni
-| Tecnica | Strumento | Cosa mostra |
-|---|---|---|
-| **Tabella connessioni attive** | `netstat -ano` (stati ESTABLISHED) | flussi in corso da/verso l'host |
-| **Classificazione protocollo** | mappatura porta→servizio | HTTPS, DNS, SSH, MQTT, RTSP… (TCP/UDP) |
-| **Risoluzione destinazione** | reverse DNS (PTR) + **geolocalizzazione, ASN e organizzazione/ISP** (ip-api, cachato) | *dove* va il traffico: 🇺🇸 Anthropic `AS399358`, 🇨🇦 Cloudflare `AS13335`, Google, AWS… |
-| **Programma sorgente** | PID di `netstat -ano` → nome processo via `tasklist` (Windows) | **quale programma** genera il traffico (claude.exe, brave.exe, svchost.exe…) |
-| **Minacce note** | porte usate da trojan/worm/backdoor (Back Orifice, NetBus, SubSeven, Mirai, MyDoom…) | flag ⚠️ sui flussi verso porte sospette |
-| **VirusTotal** | verifica gli IP pubblici su VirusTotal (`VT_API_KEY`, cachato + throttolato) | 🛑 evidenzia gli **IP malevoli** + notifica automatica |
-| **Connessione per porta** | URL browser per le porte web; per le altre un **socket TCP reale** via proxy WebSocket (`/api/v1/connect`, RFC6455 implementato senza dipendenze, ristretto agli IP LAN) → terminale interattivo | parlare davvero col servizio (HTTP/Telnet/Redis/SMTP…) in un click |
-
-### 🛡️ Sicurezza
-| Tecnica | Logica | Output |
-|---|---|---|
-| **Security risk scoring** | porte pericolose esposte (Telnet, SMB, RDP, VNC, DB…) + n° porte + vendor ignoto | punteggio 0–100 e livello **basso/medio/alto** con evidenze |
-
-### 🛰️ Architettura agent ↔ server (multi-rete)
-Un solo codice, due modalità:
-- **Server** (`npm run backend`): collector + API + **agente locale embedded** che scansiona la propria rete.
-- **Agente** (`npm run agent -- --agent http://SERVER:8000`): scansiona la rete locale e **riporta al server** via HTTP.
-
-Il server **aggrega più agenti**, sulla stessa rete o su reti diverse: ogni agente ha un `agent_id` persistente, e nei dispositivi viene tracciata la **rete di provenienza** (dedup per MAC per rete). La pagina **Impostazioni** mostra tutti gli agenti con rete, n° dispositivi e stato online/offline (heartbeat 90s).
-
-**Installer agenti pronti all'uso** (pulsanti in Impostazioni → "Scarica Installer"): il server genera e serve uno **script Windows `.bat`**, **Linux `.sh`** e un **agente Python autonomo** ([`agent/networkscope_agent.py`](agent/networkscope_agent.py), solo libreria standard). Lo script scarica l'agente Python e lo avvia puntando automaticamente al server giusto; l'agente scansiona la rete locale (ping + ARP + reverse DNS + porte) e riporta — il server arricchisce poi il **vendor** dai MAC tramite il DB OUI.
-
-### ⚡ Performance, politeness e persistenza
-| Tecnica | Come funziona | Beneficio |
-|---|---|---|
-| **Scansione incrementale** | l'arricchimento pesante (porte, banner, UPnP) viene eseguito solo per i dispositivi **nuovi o "stale"** (TTL 5 min) | cicli ~3× più veloci (es. da 27s a <10s) |
-| **Scansione educata (poco rumore)** | ciclo **leggero ogni 45s** che legge **solo la tabella ARP** (nessun pacchetto extra in rete) + sweep ICMP completo **raro** (5 min), con **jitter** anti-sincronizzazione tra agenti | drastica riduzione del traffico ICMP sulla rete |
-| **Registro persistente** | stato su `state.json` con **storico** (`first_seen`, `last_seen`, `seen_count`) | i device noti ricompaiono **subito** al riavvio |
-| **Tracciamento online/offline** | i device spariti restano *offline* e vengono rimossi dopo 30 min | si vede cosa è scomparso dalla rete |
-| **Autostart a livello utente** | `npm run autostart:install` (opz. `-- --agent http://SERVER:8000` per la modalità agente) registra un avvio al login (Startup `.vbs` Windows, `.desktop` Linux, LaunchAgent macOS) | scanner/agente **sopravvive al riavvio del PC** senza admin né servizi critici |
-
-> ⚠️ **Limiti onesti:** l'analisi dei flussi riguarda la **macchina che esegue lo scanner** (la sua socket table); per vedere il traffico *di altri* dispositivi servirebbe una porta mirror/gateway o packet-capture. Il **deep packet inspection** per-protocollo richiederebbe Npcap + privilegi (in roadmap).
-
----
-
-## 🧰 Stack tecnico
-
-| Livello | Tecnologia | Perché |
-|---|---|---|
-| **Framework** | Next.js 16 (App Router) + React 19 | Server Components, routing moderno, ottime performance |
-| **Linguaggio** | TypeScript 5 (`strict`) | Type-safety end-to-end (`Device`, `Agent`, `ScanResult`) |
-| **Styling** | Tailwind CSS 4 | UI consistente, dark mode nativa, zero CSS custom sparso |
-| **Icone** | `lucide-react` | Set coerente e leggero |
-| **Grafici** | `recharts` | Area chart fluidi e theme-aware |
-| **Topologia** | SVG nativo + hook React | Drag/zoom/pan **senza** dipendenze pesanti = bundle snello |
-| **Container** | Docker (`Dockerfile.dev`, node:20-alpine) | Ambiente riproducibile |
-
-**Scelte che rendono il progetto solido:**
-- 🧠 **Un solo data layer** (`lib/api.ts`): cambiare backend = cambiare 1 file.
-- 🪶 **Topologia fatta a mano in SVG**: niente `d3`/`vis.js` da 200 KB, controllo totale su UX.
-- 🔒 **`strict: true`** in TypeScript: i bug si prendono a compile-time.
-- ♻️ **Componenti riutilizzabili** condivisi tra Dashboard e pagine dedicate.
-
----
-
-## ⚡ Avvio rapido
-
-> Requisiti: **Node.js ≥ 20** e npm.
-
+### Opzione B: In locale con Node.js (≥ 20)
 ```bash
 # 1. Installa le dipendenze
 npm install
@@ -265,202 +46,243 @@ npm install
 # 2. Avvia il backend di scansione REALE (Terminale 1)
 npm run backend
 
-# 3. Avvia il frontend (Terminale 2)
+# 3. Avvia la dashboard Next.js (Terminale 2)
 npm run dev
 ```
+➡️ Apri **http://localhost:3000**: entro 15 secondi vedrai comparire la mappa viva della tua rete locale!
 
-➡️ Apri **http://localhost:3000** e dopo ~15s vedrai i dispositivi reali della tua rete 🎉
+### Opzione C: Modalità Demo Offline (Mock)
+Se vuoi esplorare l'interfaccia senza effettuare scansioni sulla rete fisica:
+```bash
+npm run mock    # Terminale 1 (porta 8000 con dati finti)
+npm run dev     # Terminale 2
+```
 
-| Comando | Azione |
+<details>
+<summary>📋 <b>Comandi npm disponibili</b></summary>
+
+| Comando | Descrizione |
 |---|---|
-| `npm run backend` | 🛰️ Backend di scansione **reale** della rete (porta 8000) |
-| `npm run agent -- --agent http://SERVER:8000` | 🛰️ Avvia un **agente** che scansiona la rete locale e riporta a un server remoto |
-| `npm run mock` | 🧪 Backend finto con dati demo (porta 8000) |
-| `npm run oui` | 🏷️ Scarica il DB OUI IEEE completo (~40k vendor) per la risoluzione offline |
-| `npm run autostart:install` | 🔁 Avvio automatico dello scanner al login (livello utente, **no admin**) |
+| `npm run backend` | 🛰️ Backend di scansione **reale** della LAN (porta 8000, zero dipendenze) |
+| `npm run agent -- --agent http://SERVER:8000` | 🛰️ Modalità **agente** che riporta i dati a un server centrale |
+| `npm run mock` | 🧪 Backend simulato con dati demo |
+| `npm run oui` | 🏷️ Scarica il database IEEE OUI completo (~40k vendor) per la risoluzione offline |
+| `npm run autostart:install` | 🔁 Configura l'avvio automatico al boot/login (a livello utente, no admin) |
 | `npm run autostart:uninstall` | ↩️ Rimuove l'avvio automatico |
-| `npm run dev` | Server di sviluppo frontend con hot-reload |
-| `npm run build` | Build di produzione |
-| `npm start` | Avvia la build di produzione |
-| `npm run lint` | Controllo ESLint |
-| `npm test` | Test automatici (Vitest) |
-| `docker compose up --build` | 🐳 Avvia **frontend + backend** insieme (vedi note in `docker-compose.yml`) |
+| `npm run dev` | Server di sviluppo frontend con hot-reload (porta 3000) |
+| `npm run build` | Compilazione Next.js per produzione |
+| `npm run lint` | Linter ESLint |
+| `npm test` | Suite di test Vitest sui moduli server e pure function |
+
+</details>
 
 ---
 
-## 🧪 Come testare dalla GUI web
+## 🖼️ Le Schermate
 
-### 🅰️ Monitoraggio REALE della tua rete (lo scopo del progetto)
+<table>
+  <tr>
+    <td width="50%"><img src="assets/home.png" alt="Dashboard — KPI, topologia di rete e traffico live" /></td>
+    <td width="50%"><img src="assets/traffico.png" alt="Traffico — mappa dei flussi, dettaglio flusso e connessioni" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>🏠 Dashboard</b><br/>KPI, topologia interattiva con nodi drag & drop e traffico live</td>
+    <td align="center"><b>📈 Traffico</b><br/>Mappa mondiale dei flussi, processi sorgente, ASN, GeoIP e VirusTotal</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/dispositivi.png" alt="Dispositivi — inventario e terminale SSH reale" /></td>
+    <td width="50%" valign="top">
+      <br/>
+      <b>📇 Dispositivi + 🖥️ Terminale interattivo reale</b><br/>
+      Inventario completo con risk scoring di sicurezza. Per ogni porta aperta puoi aprire direttamente il browser o un
+      <b>terminale interattivo TCP reale</b> (es. sessione SSH con banner reale, Telnet, Redis, HTTP) integrato via proxy WebSocket.
+      Completano l'app la <b>🗺️ Mappa topologica full-screen</b> e le <b>⚙️ Impostazioni</b> di gestione agenti e token.
+    </td>
+  </tr>
+</table>
 
-Il repo include un **backend di scansione reale** a zero dipendenze ([`server.mjs`](server.mjs)) che **non simula nulla**: rileva la tua subnet, fa il **ping-sweep** della `/24`, legge la **tabella ARP** per i MAC, risolve **hostname** (reverse DNS) e **vendor** (OUI + lookup online), e fa **scansione porte TCP reale**. Non serve essere amministratore.
+| Rotta | Sezione | Descrizione |
+|---|---|---|
+| `/` | 🏠 **Dashboard** | Hub centrale: KPI, topologia SVG compatta, traffico in tempo reale, azioni rapide |
+| `/dispositivi` | 📇 **Dispositivi** | Inventario ricercabile per IP/vendor, dettagli di sicurezza, terminale su porte aperte, export CSV/PDF |
+| `/mappa` | 🗺️ **Mappa** | Topologia di rete a schermo intero con zoom, pan, trascinamento nodi e ispezione |
+| `/traffico` | 📈 **Traffico** | Throughput (KB/s), pacchetti/s, mappa mondiale dei flussi, associazione PID/processo, ASN e VirusTotal |
+| `/impostazioni` | ⚙️ **Impostazioni** | Gestione multi-agente, download installer script, configurazione token, offline mode e chiave VirusTotal |
 
-```bash
-# Terminale 1 — avvia il backend di scansione (porta 8000)
-npm run backend       # = node server.mjs
+---
 
-# Terminale 2 — avvia il frontend (porta 3000)
-npm run dev
+## ✨ Perché NetworkScope
+
+> _"Conosci ogni dispositivo che respira sulla tua rete — prima che lo faccia qualcun altro."_
+
+La maggior parte degli utenti non sa davvero cosa sia collegato al proprio router: telecamere IoT economiche, vecchi apparati dimenticati con SMB spalancato o smartphone con MAC casuali. 
+
+**NetworkScope** trasforma l'output ostico dei vecchi tool da terminale in un pannello di controllo moderno, reattivo e gradevole:
+
+| Senza NetworkScope 😵 | Con NetworkScope 😎 |
+|---|---|
+| `arp -a` in un terminale nero e statico | Topologia interattiva SVG drag & drop in stile Packet Tracer |
+| "C'è qualcosa sull'IP `.47`, ma chissà cos'è" | Hostname, vendor, OS da TTL, porte aperte e tipologia in un click |
+| Zero avvisi di sicurezza | Rilevamento automatico anomalie, trojan ports e risk score |
+| Tool di monitoraggio pesanti anni '90 | UI moderna in Next.js 16 + Tailwind 4, tema Dark/Light nativo |
+
+---
+
+## 🎯 A chi serve (Target)
+
+| 👤 Profilo | 💡 Caso d'uso |
+|---|---|
+| 🏠 **Home Lab & Smart Home** | Ispezione continua di IoT (Shelly, ESP), NAS, inverter FV, colonnine EV e dispositivi ospiti |
+| 🛡️ **Cybersecurity & Studenti CTF** | Mappatura rapida del perimetro LAN, porte esposte, banner grabbing e connessioni esterne |
+| 🧑‍💻 **Sysadmin & Retisti PMI** | Inventario immediato senza installare agenti pesanti o server Enterprise proprietari |
+| 🎓 **Didattica Networking** | Visualizzazione dinamica e intuitiva del modello di rete per spiegare subnet e routing |
+
+---
+
+## 🚀 Funzionalità Principali
+
+- 📊 **Dashboard Live**: Conteggio dispositivi totali, online/offline, reti monitorate e alert di sicurezza con refresh dinamico.
+- 🗺️ **Topologia Interattiva SVG nativa**: Nodi trascinabili, zoom, pan, gateway evidenziato e pannello laterale (zero dipendenze pesanti tipo d3/vis.js).
+- 🔍 **Scansione Reale & Zero Admin**: Ping-sweep parallelo sulla `/24`, lettura ARP, reverse DNS e port scan TCP senza privilegi amministrativi.
+- 🧠 **Fingerprinting Intelligente**: Riconosce OS via TTL, vendor via IEEE OUI (40k record offline), MAC randomizzati (privacy iPhone/Android), inverter fotovoltaici, colonnine EV, stampanti, container Docker, camere RTSP e smart TV.
+- 📈 **Monitoraggio Traffico & Pacchetti**: Throughput reale (KB/s, MB/s) e pacchetti/s campionati dai contatori di sistema ogni 2s con grafici fluidi.
+- 🔗 **Analisi Flussi & Mappa Mondiale**: Correlazione tra connessione attiva, protocollo, processo locale (`tasklist`), geolocalizzazione, ASN dell'ISP e verifica IP malevoli via **VirusTotal**.
+- 🔬 **Deep Packet Inspection (6000+ protocolli)**: Database integrato dal registro IANA con firme su trojan/worm noti. Con modulo opzionale `pcap` (Npcap/libpcap) campiona i payload reali.
+- 🖥️ **Terminale Interattivo Web-to-TCP**: Click sulle porte aperte per interagire via browser con i servizi (sessioni SSH con banner autentico, Telnet, Redis, HTTP).
+- 🛰️ **Architettura Multi-Agent**: Un unico server centrale può aggregare scansioni da più macchine/subnet diverse tramite script installer automatici (`.bat`, `.sh`, Python autonomo).
+- 🔔 **Notifiche Realtime via WebSocket**: Aggiornamenti push istantanei all'ingresso di nuovi dispositivi sulla rete.
+- 📤 **Export Dati**: Esportazione istantanea dell'inventario in formato CSV e PDF.
+
+---
+
+## 🏗️ Architettura del Sistema
+
 ```
-
-Apri **http://localhost:3000**: dopo ~15s vedrai i **dispositivi reali** della tua LAN. Il backend ri-scansiona da solo ogni 60s; il pulsante **"Avvia Scansione"** forza un refresh; il pulsante **"Scan"** su un dispositivo ne analizza le porte aperte dal vivo.
-
-> ⚙️ **Come funziona davvero**
-> | Dato | Tecnica |
-> |---|---|
-> | Host attivi | `ping` sweep di `x.y.z.1–254` in parallelo |
-> | MAC address | parsing di `arp -a` di sistema |
-> | Hostname | reverse DNS + **NetBIOS** (`nbtstat`, Windows) |
-> | Vendor | tabella **OUI offline** (170+ prefissi) + coda online **throttolata e persistente** (`.vendor-cache.json`) |
-> | Porte aperte | **fingerprint** automatico (~24 porte) + scan profondo on-demand |
-> | Tipo + OS | classificazione per **firma porte + vendor + MAC + hostname** |
->
-> 🔎 **Identifica automaticamente:** 📱 iPhone (porta 62078) · 🤖 Android/smartphone (anche con **MAC randomizzato** privacy) · 📶 access point/router · 🖥️ PC Windows (SMB/RDP) · 🐧 server Linux · 💾 NAS · 🖨️ stampanti · 📷 camere IP (RTSP) · ☀️ **inverter fotovoltaici** (Modbus 502) · 🔌 **colonnine EV** · 📺 smart TV/media (Chromecast) · 🐳 **container Docker**/VM · 💡 IoT (ESP/Tuya/Shelly).
-
-### 🅱️ Demo con dati finti (offline, senza toccare la rete)
-
-Se vuoi solo vedere la UI popolata senza scansionare nulla, usa il **mock** ([`mock-api.mjs`](mock-api.mjs)) con 6 dispositivi di esempio:
-
-```bash
-npm run mock          # Terminale 1 (porta 8000)
-npm run dev           # Terminale 2 (porta 3000)
+🌐 Browser Client
+   │  (WebSocket /api/v1/events + Polling)
+   ▼
+⚛️ Next.js 16 (App Router) ──► Proxy Same-Origin (/api/backend/[...path])
+   │                           (Iniesta NS_TOKEN server-side, mai esposto al client)
+   ├─ 🏠 /
+   ├─ 📇 /dispositivi
+   ├─ 🗺️ /mappa
+   ├─ 📈 /traffico
+   └─ ⚙️ /impostazioni
+        │
+        ▼
+🔗 lib/api.ts (Unico punto di integrazione frontend)
+        │
+        ▼
+🟩 Backend Server (server.mjs · Porta 8000 · Zero dipendenze esterne)
+   ├─ 🛰️ Engine di scansione (ICMP sweep, ARP table, reverse DNS, TCP connect)
+   ├─ 🧠 Moduli interni (lib/server/):
+   │    ├─ netparse.mjs  ── TTL, MAC OUI, parser ARP
+   │    ├─ dpi.mjs       ── 6150+ porte IANA, firme minacce
+   │    ├─ geo.mjs       ── MaxMind GeoLite2 locale / ip-api fallback
+   │    ├─ auth.mjs      ── Validazione token & ticket WS monouso
+   │    └─ pcap.mjs      ── Cattura pacchetti (Npcap / libpcap opzionale)
+   └─ 🔌 Proxy WebSocket/TCP (/api/v1/connect) ── RFC6455 verso IP LAN
+        │
+        ▼
+🌐 Subnet Locale (LAN /24) + Agenti Remoti
 ```
 
 ---
 
-## 🐳 Avvio con Docker
+## 🔬 Tecniche di Monitoraggio Reali
 
-**Tutto con un comando** ([`docker-compose.yml`](docker-compose.yml)) — frontend + backend:
+Tutte le tecniche sono attive e funzionanti in `server.mjs` sfruttando utility di sistema standard:
 
-```bash
-docker compose up --build
-# frontend http://localhost:3000 · backend http://localhost:8000
-# con auth:  NS_TOKEN=un-segreto docker compose up --build
-```
+### 🔎 Scoperta dei dispositivi
+| Tecnica | Strumento | Cosa rileva |
+|---|---|---|
+| **ICMP ping-sweep** | `ping` batch paralleli su `1–254` | Host attivi e responsivi nella `/24` |
+| **Lettura ARP** | `arp -a` di sistema | Indirizzi MAC e risoluzione locale |
+| **Re-scan periodico** | Loop automatico (45s ARP / sweep periodico) | Nuovi arrivi e rilevamento disconnessioni |
 
-> ⚠️ Per scansionare la rete **reale** serve `network_mode: host` (già impostato) e funziona su **Linux**. Su Windows/macOS Docker Desktop la LAN non è raggiungibile in host mode: usa `npm run backend` nativo o il mock. Dettagli nel file compose.
+### 🧠 Identificazione e fingerprinting
+| Tecnica | Meccanismo | Risultato |
+|---|---|---|
+| **OS via TTL** | Ispezione del TTL della risposta ICMP (64=Linux/Mac, 128=Windows, 255=Embedded) | Famiglia del sistema operativo |
+| **Latenza RTT** | Tempo di round-trip del pacchetto ping | Stato e qualità del collegamento |
+| **TCP Connect Scan** | Apertura socket TCP su porte note (~24 standard + scan profondo) | Servizi in ascolto |
+| **Banner Grabbing** | Lettura stringhe di benvenuto SSH/FTP, header HTTP `Server:`, certificati TLS | Versione esatta del software |
+| **SSDP / UPnP** | Multicast M-SEARCH su `239.255.255.250:1900` + parsing XML | Nome, modello e marca (Smart TV, NAS, stampanti) |
+| **Risoluzione Nomi** | Reverse DNS (PTR) + NetBIOS (`nbtstat`) | Hostname leggibile |
+| **Vendor OUI** | Prefisso MAC confrontato con database IEEE offline (~40k vendor) | Costruttore della scheda di rete |
+| **MAC Randomizzato** | Bit *locally-administered* nel MAC address | Individuazione privacy mode (iOS / Android) |
+| **Risk Scoring** | Euristica pesata (porte sensibili come 23, 445, 3389, 5900 + vendor sconosciuto) | Indice di rischio 0–100 (Basso/Medio/Alto) |
 
-Solo frontend (immagine singola):
-```bash
-docker build -f Dockerfile.dev -t networkscope:dev .
-docker run -it --rm -p 3000:3000 networkscope:dev
-```
+### 📈 Flussi, Traffico e Sicurezza
+| Tecnica | Strumento | Cosa misura / evidenzia |
+|---|---|---|
+| **Contatori Scheda** | `netstat -e` (Windows) / `/proc/net/dev` (Linux) | Throughput (KB/s, MB/s) e pacchetti/s in tempo reale |
+| **Connessioni Attive** | `netstat -ano` (stati ESTABLISHED) | Socket aperte da/verso la macchina |
+| **Processo Locale** | Mappatura PID su `tasklist` | Applicazione sorgente del traffico (es. `brave.exe`, `claude.exe`) |
+| **Arricchimento Destinazione** | MaxMind GeoLite2 locale (`.mmdb`) o fallback `ip-api` | Paese, città, coordinate geografiche e ASN/Organizzazione |
+| **Threat Intelligence** | Porte trojan note (SubSeven, NetBus, Mirai...) + **VirusTotal API** | Evidenziazione visiva degli IP malevoli e notifiche |
+| **Terminale su Porta** | Proxy RFC6455 WebSocket ↔ TCP socket verso IP RFC1918 | Shell interattiva dal browser sul servizio di rete |
+
+> ⚠️ **Nota di trasparenza tecnica sui limiti:** L'analisi approfondita dei flussi e dei processi riguarda la macchina su cui gira lo scanner/agente (socket table locale). Per monitorare i flussi di pacchetti generati da *altri* apparati della LAN è necessaria una porta mirror sullo switch o l'adozione di packet capture (Npcap/libpcap) con privilegi di rete adeguati.
 
 ---
 
-## 🔌 Backend & API
+## 🧩 Capacità Avanzate & Moduli Opzionali
 
-Tutte le chiamate passano da un **unico data layer** ([`lib/api.ts`](lib/api.ts)) che usa `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`). Il repo fornisce un'implementazione **reale** ([`server.mjs`](server.mjs)) e una **mock** ([`mock-api.mjs`](mock-api.mjs)) — entrambe rispettano questo contratto:
+Ogni modulo aggiuntivo opera in modalità **best-effort con graceful degradation**: se un componente o privilegio non è presente, l'applicazione continua a funzionare regolarmente mostrando lo stato effettivo nel pannello delle evidenze.
 
-Il frontend si aspetta queste rotte:
+### 📡 Cattura Pacchetti Reale (Npcap / libpcap)
+Consente di quantificare i byte reali per singolo flusso e campionare i payload per la Deep Packet Inspection:
+- **Windows**: installa [Npcap](https://npcap.com/) abilitando l'opzione *"WinPcap API-compatible Mode"*. Esegui il backend da una console elevata (`Amministratore`).
+- **Linux**: installa `libpcap-dev` e assegna le capability raw: `sudo setcap cap_net_raw,cap_net_admin=eip $(which node)`.
+- **Docker**: l'immagine `Dockerfile.backend` include già `libpcap` con capability `NET_RAW` e `NET_ADMIN`.
+
+### 🗺️ Geolocalizzazione Offline MaxMind
+Per non trasmettere query IP verso API terze:
+1. Scarica i file `GeoLite2-City.mmdb` e `GeoLite2-ASN.mmdb` dal sito ufficiale MaxMind.
+2. Inseriscili nella cartella `data/` del progetto.
+3. Al riavvio, il provider commuterà automaticamente su MaxMind offline.
+
+---
+
+## 🔐 Sicurezza & Produzione
+
+NetworkScope è progettato per il monitoraggio della **propria infrastruttura locale**.
+
+### Misure di protezione già integrate
+- **Token Server-Side protetto**: Impostando `NS_TOKEN`, il frontend Next.js funge da reverse proxy same-origin (`/api/backend/*`). Il segreto risiede esclusivamente nel processo server e non viene mai incluso nel bundle JavaScript client né esposto in DevTools.
+- **Ticket WebSocket Monouso**: Le sessioni del terminale non passano token statici nei parametri URL: richiedono preventivamente un ticket usa-e-getta temporaneo (`POST /api/v1/ws-ticket`, scadenza 30s).
+- **Protezione RFC1918**: Il proxy del terminale accetta connessioni socket **esclusivamente verso indirizzi IP privati** di rete locale, prevenendo rimbalzi arbitrari verso Internet.
+- **Modalità 100% Offline**: Avviando il backend con `NS_OFFLINE=1`, vengono disabilitate tutte le chiamate esterne (geolocalizzazione remota e VirusTotal).
+- **Resilienza ai crash**: Gestione globale con timeout su tutte le chiamate di rete, banner grabbing e comandi di sistema.
+
+---
+
+## 🔌 API Reference
+
+Il frontend interagisce con il backend tramite un unico data layer (`lib/api.ts`) conforme a questo schema:
 
 | Metodo | Endpoint | Scopo |
 |---|---|---|
-| `GET` | `/api/v1/devices` | Elenco dispositivi |
-| `GET` | `/api/v1/devices/:ip` | Dettaglio dispositivo |
-| `PATCH` | `/api/v1/devices/:ip` | Aggiorna (es. hostname) |
-| `POST` | `/api/v1/scan/network?subnet=...` | Avvia scansione rete |
-| `POST` | `/api/v1/scan/ports/:ip` | Avvia scansione porte |
-| `GET` | `/api/v1/agents` | Agent registrati (scanner locale) |
-| `DELETE` | `/api/v1/agents/:id` | Rimuove un agent |
-| `GET` | `/api/v1/traffic` | Serie temporale traffico reale (KB/s + pacchetti/s + totali) |
-| `GET` | `/api/v1/connections` | Connessioni attive: protocollo, sorgente, destinazione (reverse DNS) |
-| `GET` | `/api/v1/capabilities` | Stato dei motori: cattura pacchetti, DPI, geolocalizzazione |
-| `WS` | `/api/v1/events` | Push in tempo reale (nuovi dispositivi, eventi) |
-
-**Modello dati** (`types/index.ts`):
-
-```ts
-interface Device {
-  id: number;
-  ip_address: string;
-  mac_address: string | null;
-  hostname: string | null;
-  vendor: string | null;
-  is_active: boolean;
-  last_seen: string;
-  device_type: string;   // gateway | router | server | mobile | printer | iot_device | ...
-  open_ports: number[];
-}
-```
-
----
-
-## 🧩 Capacità avanzate
-
-Il backend è organizzato in **moduli** (`lib/server/`) — `auth.mjs` (token + ticket WS), `netparse.mjs` (TTL/MAC/ARP/OUI), `dpi.mjs` (protocolli + minacce), `geo.mjs` (MaxMind + ip-api), `pcap.mjs` (cattura pacchetti). Le funzioni pure sono coperte da **test** (`npm test`). Ogni capacità funziona in modo **best-effort e degrada con eleganza**: la pagina **Traffico** mostra un pannello "Motore di analisi — evidenze" con lo stato reale di ciascun motore.
-
-**`cap` (cattura pacchetti) e `maxmind` (geo) sono ora dipendenze del progetto**: `npm install` le installa e le compila (il native `cap` richiede build tools + header libpcap, vedi sotto). Il `Dockerfile.backend` le installa già nell'immagine.
-
-### 📡 Cattura pacchetti reale (Npcap / libpcap)
-Per vedere i **byte effettivi per flusso** (non solo la socket table) e fare deep inspection sui payload:
-
-- **Windows**: installa **[Npcap](https://npcap.com/)** e — importante — spunta **"Install Npcap in WinPcap API-compatible Mode"**. Per la cattura live avvia il backend **come Amministratore** (`node server.mjs` da un PowerShell elevato): con l'opzione di default "restrict to Administrators", un processo non-admin apre l'interfaccia ma **non riceve pacchetti**.
-- **Linux/macOS**: serve **libpcap** (build: `apt install libpcap-dev`) e privilegi raw — avvia con `sudo` **oppure** concedi la capability: `sudo setcap cap_net_raw,cap_net_admin=eip $(which node)`.
-- **Docker** (Linux): già configurato — `Dockerfile.backend` installa `libpcap`, il `docker-compose.yml` aggiunge `cap_add: [NET_RAW, NET_ADMIN]` + `network_mode: host`. `docker compose up --build` e la cattura è attiva.
-
-Senza questi requisiti l'app resta in **modalità socket-table** (il pannello evidenze lo indica). È l'unica capacità che richiede privilegi: tutto il resto gira senza admin.
-
-### 🗺️ Geolocalizzazione MaxMind (più affidabile di ip-api)
-1. Crea un account gratuito **[MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data)** e scarica `GeoLite2-City.mmdb` (opzionale: `GeoLite2-ASN.mmdb`).
-2. Mettili in `data/`. Il reader `maxmind` è già una dipendenza del progetto (installato da `npm install`).
-3. Riavvia: il provider passa automaticamente a **MaxMind** (nessun IP inviato a terzi). Senza DB, fallback a **ip-api** con backoff.
-
-### 🔬 Deep Packet Inspection
-Il dataset dei 6000+ servizi (`data/iana-ports.json`) è generato dal registro IANA ed è rigenerabile:
-```bash
-node scripts/build-iana.mjs data/service-names-port-numbers.csv
-```
-
----
-
-## 🔐 Sicurezza & note di produzione
-
-NetworkScope è pensato come **strumento di monitoraggio della propria rete locale**. Scansiona solo reti che possiedi o per cui hai autorizzazione.
-
-### ✅ Robustezza già implementata
-- **Nessun crash per errori imprevisti**: handler globali `uncaughtException` / `unhandledRejection`, ogni richiesta HTTP è in `try/catch` (risponde 500 invece di cadere), l'upgrade WebSocket è protetto.
-- **Timeout ovunque**: ping, port scan, banner/TLS, reverse DNS, lookup org, comandi di sistema — niente operazioni che possono restare appese.
-- **Best-effort**: vendor/DNS/UPnP/org falliscono in silenzio senza interrompere la scansione; cache su disco per vendor e stato.
-- **Scansione "educata"**: ciclo ARP silenzioso + sweep ICMP raro con jitter → poco rumore in rete.
-
-### 🔒 Token server-side (il segreto non finisce nel browser)
-Di default il frontend parla col backend tramite un **proxy same-origin** (`app/api/backend/[...path]`): il `NS_TOKEN` è letto **solo lato server** (variabile `NS_TOKEN`, **non** `NEXT_PUBLIC_*`) e iniettato nell'header verso il backend, quindi **non è mai incluso nel bundle JS** né visibile in DevTools. Configura:
-
-```bash
-# frontend (Next): backend da raggiungere + segreto server-side
-NS_BACKEND_URL=http://localhost:8000  NS_TOKEN=un-segreto-forte  npm run dev
-# backend: stesso segreto
-NS_TOKEN=un-segreto-forte  npm run backend
-# agente su un'altra macchina
-NS_TOKEN=un-segreto-forte  npm run agent -- --agent http://SERVER:8000
-```
-
-Il **terminale WebSocket** non usa più il token nell'URL: il frontend richiede un **ticket monouso a breve scadenza** (`POST /api/v1/ws-ticket`, 30s, one-shot) tramite il proxy autenticato e lo passa al WebSocket (`?ticket=…`). Così nemmeno la sessione del terminale espone il segreto.
-
-> Modalità **diretta legacy** (solo uso locale): impostando `NEXT_PUBLIC_API_URL` (+ `NEXT_PUBLIC_NS_TOKEN`) il browser parla direttamente col backend — comodo ma il token torna nel client. Preferisci il proxy per qualsiasi uso condiviso.
-
-### 🕶️ Modalità offline (nessun dato verso terzi)
-`NS_OFFLINE=1` sul backend **disattiva tutte le chiamate esterne** (geo/ASN via `ip-api.com` e VirusTotal): nessun IP delle tue destinazioni lascia la macchina. Le Impostazioni segnalano lo stato. Per contesti sensibili/aziendali.
-
-### ⚠️ Cosa indurire PRIMA di un uso oltre la LAN fidata
-| Aspetto | Stato attuale | Mitigazione consigliata |
-|---|---|---|
-| **Autenticazione** | **token opzionale server-side**: `NS_TOKEN` sul backend + sul processo Next (proxy). API, WebSocket (via ticket) e report agenti richiedono il token. Non impostato = aperto (comodo in locale). | attivare `NS_TOKEN` per qualsiasi uso oltre `localhost` |
-| **Proxy terminale (WebSocket↔TCP)** | apre socket TCP verso host **solo della LAN** (RFC1918); con `NS_TOKEN` attivo richiede un **ticket monouso** (o il token) | tenere il server su rete fidata + token |
-| **Esposizione di rete** | il server ascolta su `0.0.0.0:8000` (serve agli agenti remoti) | se non servono agenti remoti, bind su `127.0.0.1`; altrimenti firewall/VPN + token |
-| **Trasporto** | HTTP/WS in chiaro | mettere dietro reverse proxy con **HTTPS/WSS** |
-| **Lookup geo/ASN/org** | invia gli **IP di destinazione pubblici** a `ip-api.com` | `NS_OFFLINE=1` per restare 100% offline |
-| **VirusTotal** | opzionale (`VT_API_KEY` o chiave dalle **Impostazioni**, salvata in `.ns-config.json`): invia gli **IP pubblici** a VirusTotal | `NS_OFFLINE=1` per disattivarlo; `.ns-config.json` è in `.gitignore` |
-
-> In sintesi: ottimo come tool personale/di laboratorio sulla **tua** rete. Per un uso condiviso/esposto attiva **`NS_TOKEN`** (server-side via proxy), valuta **`NS_OFFLINE`** e metti **HTTPS/WSS** davanti.
+| `GET` | `/api/v1/devices` | Restituisce la lista di tutti i dispositivi identificati |
+| `GET` | `/api/v1/devices/:ip` | Dettaglio approfondito del singolo dispositivo |
+| `PATCH` | `/api/v1/devices/:ip` | Modifica metadati (es. assegnazione hostname personalizzato) |
+| `POST` | `/api/v1/scan/network` | Attiva una scansione on-demand della subnet |
+| `POST` | `/api/v1/scan/ports/:ip` | Avvia scansione porte approfondita sul target |
+| `GET` | `/api/v1/agents` | Elenco degli agenti attivi e stato dell'heartbeat |
+| `GET` | `/api/v1/traffic` | Metriche temporali di throughput e pacchetti/s |
+| `GET` | `/api/v1/connections` | Tabella flussi e connessioni con arricchimento Geo/ASN |
+| `GET` | `/api/v1/capabilities` | Stato dei motori (PCAP, DPI, GeoProvider) |
+| `WS` | `/api/v1/events` | Stream WebSocket eventi e notifiche nuovi host |
+| `WS` | `/api/v1/connect` | Proxy terminale interattivo TCP (con ticket monouso) |
 
 ---
 
 ## 📜 Licenza
 
-Distribuito sotto licenza **MIT**. Usalo, modificalo, miglioralo. ⭐ Se ti è utile, lascia una stella!
+Distribuito con licenza **MIT**. Consulta il file `LICENSE` per ulteriori dettagli.
 
 <div align="center">
 <br/>
-<sub>Costruito con ⚛️ Next.js, ❤️ e un sano sospetto verso i dispositivi sconosciuti sulla rete.</sub>
+<sub>Sviluppato con ⚛️ Next.js, ❤️ e una sana curiosità verso i pacchetti che transitano sulla rete.</sub>
 </div>
