@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { fetchAgents, deleteAgent, fetchConfig, setVtApiKey } from '@/lib/api';
+import { fetchAgents, deleteAgent, fetchConfig, setVtApiKey, setTelegramConfig, testTelegram } from '@/lib/api';
 import { Agent } from '@/types';
 import {
     Bell, Cpu, Terminal, Download, ShieldAlert,
-    Monitor, Server, RefreshCw, Trash2, CheckCircle, XCircle, Clock
+    Monitor, Server, RefreshCw, Trash2, CheckCircle, XCircle, Clock, Send
 } from 'lucide-react';
 
 export default function ImpostazioniPage() {
@@ -16,6 +16,11 @@ export default function ImpostazioniPage() {
     const [notifications, setNotifications] = useState(true);
     const [vtKey, setVtKey] = useState('');
     const [vtConfigured, setVtConfigured] = useState(false);
+    const [tgToken, setTgToken] = useState('');
+    const [tgChatId, setTgChatId] = useState('');
+    const [tgConfigured, setTgConfigured] = useState(false);
+    const [savingTg, setSavingTg] = useState(false);
+    const [testingTg, setTestingTg] = useState(false);
     const [offline, setOffline] = useState(false);
     const [savingVt, setSavingVt] = useState(false);
 
@@ -31,6 +36,38 @@ export default function ImpostazioniPage() {
         } finally {
             setSavingVt(false);
             setTimeout(() => setToast(null), 2500);
+        }
+    };
+
+    const saveTg = async () => {
+        setSavingTg(true);
+        try {
+            const r = await setTelegramConfig(tgToken, tgChatId);
+            setTgConfigured(r.telegramConfigured);
+            setTgToken('');
+            setToast({ msg: r.telegramConfigured ? 'Configurazione Telegram salvata!' : 'Configurazione Telegram rimossa', type: 'success' });
+        } catch {
+            setToast({ msg: 'Errore nel salvataggio della configurazione Telegram', type: 'error' });
+        } finally {
+            setSavingTg(false);
+            setTimeout(() => setToast(null), 2500);
+        }
+    };
+
+    const handleTestTg = async () => {
+        setTestingTg(true);
+        try {
+            const r = await testTelegram(tgToken || undefined, tgChatId || undefined);
+            if (r.ok) {
+                setToast({ msg: '🔔 Messaggio inviato su Telegram! Controlla la chat.', type: 'success' });
+            } else {
+                setToast({ msg: `Errore test Telegram: ${r.error || 'Verifica token e chat ID'}`, type: 'error' });
+            }
+        } catch {
+            setToast({ msg: 'Impossibile inviare il messaggio di test', type: 'error' });
+        } finally {
+            setTestingTg(false);
+            setTimeout(() => setToast(null), 3500);
         }
     };
 
@@ -76,7 +113,12 @@ export default function ImpostazioniPage() {
             if (savedNotif !== null) setNotifications(savedNotif === 'true');
         }
         loadAgents();
-        fetchConfig().then((c) => { setVtConfigured(c.vtConfigured); setOffline(!!c.offline); }).catch(() => { });
+        fetchConfig().then((c) => {
+            setVtConfigured(c.vtConfigured);
+            setTgConfigured(!!c.telegramConfigured);
+            if (c.tgChatId) setTgChatId(c.tgChatId);
+            setOffline(!!c.offline);
+        }).catch(() => { });
         const interval = setInterval(loadAgents, 15000);
         window.addEventListener('ns:refresh', loadAgents);
         return () => { clearInterval(interval); window.removeEventListener('ns:refresh', loadAgents); };
@@ -377,6 +419,82 @@ export default function ImpostazioniPage() {
                     )}
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                         Ottieni una chiave gratuita su <span className="text-indigo-500">virustotal.com</span>. La chiave è salvata solo sul tuo server locale (<code>.ns-config.json</code>) e usata per interrogare l&apos;API di VirusTotal sugli IP verso cui la tua rete comunica.
+                    </p>
+                </div>
+
+                {/* Notifiche Telegram Bot (Homelab Alert) */}
+                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 border border-slate-200/70 dark:border-white/10">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <div className="p-2 bg-sky-100 dark:bg-sky-900/30 rounded-lg mr-3">
+                                <Send className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifiche Telegram Bot</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Ricevi un avviso sul tuo smartphone appena un nuovo dispositivo entra in rete</p>
+                            </div>
+                        </div>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${tgConfigured ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                            {tgConfigured ? 'Attivo' : 'Non configurato'}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Bot Token (da @BotFather)</label>
+                            <input
+                                type="password"
+                                value={tgToken}
+                                onChange={(e) => setTgToken(e.target.value)}
+                                placeholder={tgConfigured ? '•••••••••• (token salvato)' : 'es. 123456789:ABCdefGHIjkl...'}
+                                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Chat ID (da @userinfobot)</label>
+                            <input
+                                type="text"
+                                value={tgChatId}
+                                onChange={(e) => setTgChatId(e.target.value)}
+                                placeholder="es. 123456789"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-white/10 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={saveTg}
+                            disabled={savingTg || (!tgToken.trim() && !tgConfigured)}
+                            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {savingTg ? 'Salvataggio…' : 'Salva configurazione'}
+                        </button>
+                        <button
+                            onClick={handleTestTg}
+                            disabled={testingTg || (!tgConfigured && !tgToken.trim())}
+                            className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
+                        >
+                            <Send className="w-3.5 h-3.5" />
+                            {testingTg ? 'Invio test…' : 'Invia notifica di test'}
+                        </button>
+                        {tgConfigured && (
+                            <button
+                                onClick={() => {
+                                    setTgToken('');
+                                    setTgChatId('');
+                                    setTgConfigured(false);
+                                    setTelegramConfig('', '').then((r) => setTgConfigured(r.telegramConfigured)).catch(() => {});
+                                }}
+                                className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
+                            >
+                                Rimuovi
+                            </button>
+                        )}
+                    </div>
+
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2.5">
+                        Ideale se lasci NetworkScope in esecuzione 24/7 su Raspberry Pi o Home Server: riceverai un messaggio istantaneo appena un nuovo MAC entra nella LAN con IP, vendor, OS e livello di rischio.
                     </p>
                 </div>
             </div>

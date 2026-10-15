@@ -171,7 +171,12 @@ export async function fetchConnections(): Promise<Connection[]> {
     return res.json();
 }
 
-export async function fetchConfig(): Promise<{ vtConfigured: boolean; offline?: boolean }> {
+export async function fetchConfig(): Promise<{
+    vtConfigured: boolean;
+    telegramConfigured?: boolean;
+    tgChatId?: string;
+    offline?: boolean;
+}> {
     const res = await apiFetch('/api/v1/config');
     if (!res.ok) throw new Error('Impossibile recuperare la configurazione');
     return res.json();
@@ -186,3 +191,23 @@ export async function setVtApiKey(vtApiKey: string): Promise<{ vtConfigured: boo
     if (!res.ok) throw new Error('Impossibile salvare la configurazione');
     return res.json();
 }
+
+export async function setTelegramConfig(tgBotToken: string, tgChatId: string): Promise<{ telegramConfigured: boolean }> {
+    const res = await apiFetch('/api/v1/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tgBotToken, tgChatId }),
+    });
+    if (!res.ok) throw new Error('Impossibile salvare la configurazione Telegram');
+    return res.json();
+}
+
+export async function testTelegram(tgBotToken?: string, tgChatId?: string): Promise<{ ok: boolean; error?: string }> {
+    const res = await apiFetch('/api/v1/telegram/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tgBotToken, tgChatId }),
+    });
+    return res.json();
+}
+

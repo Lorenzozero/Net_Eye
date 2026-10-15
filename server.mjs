@@ -334,11 +334,59 @@ const vtQueue = [];
 let vtRunning = false;
 let procMap = { at: 0, map: {} }; // cache PID→processo
 
-// Integrazione VirusTotal (opzionale): da env oppure impostata a runtime dalle Impostazioni.
+// Integrazione VirusTotal e Telegram Bot: da env oppure impostate a runtime dalle Impostazioni.
 const CONFIG_FILE = new URL('./.ns-config.json', import.meta.url);
 let vtApiKey = process.env.VT_API_KEY || null;
-(() => { try { const c = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')); if (!vtApiKey && c.vtApiKey) vtApiKey = c.vtApiKey; } catch { /* no config */ } })();
-function saveConfig() { try { writeFileSync(CONFIG_FILE, JSON.stringify({ vtApiKey })); } catch { /* ignore */ } }
+let tgBotToken = process.env.TELEGRAM_BOT_TOKEN || null;
+let tgChatId = process.env.TELEGRAM_CHAT_ID || null;
+
+(() => {
+  try {
+    const c = JSON.parse(readFileSync(CONFIG_FILE, 'utf8'));
+    if (!vtApiKey && c.vtApiKey) vtApiKey = c.vtApiKey;
+    if (!tgBotToken && c.tgBotToken) tgBotToken = c.tgBotToken;
+    if (!tgChatId && c.tgChatId) tgChatId = c.tgChatId;
+  } catch { /* no config */ }
+})();
+
+function saveConfig() {
+  try {
+    writeFileSync(CONFIG_FILE, JSON.stringify({ vtApiKey, tgBotToken, tgChatId }, null, 2));
+  } catch { /* ignore */ }
+}
+
+async function sendTelegramAlert(text) {
+  if (!tgBotToken || !tgChatId || OFFLINE) return false;
+  return new Promise((resolve) => {
+    try {
+      const payload = JSON.stringify({
+        chat_id: tgChatId,
+        text,
+        parse_mode: 'Markdown',
+      });
+      const req = https.request(
+        `https://api.telegram.org/bot${tgBotToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+          timeout: 5000,
+        },
+        (res) => {
+          resolve(res.statusCode === 200);
+        }
+      );
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+      req.write(payload);
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
+}
 
 // Porte note usate da trojan/worm/backdoor → segnalazione (identificazione minacce di base).
 const THREAT_PORTS = {
@@ -768,6 +816,9 @@ async function processLive(live, pingInfo, arp, upnpByIp, markOffline) {
         ip: d.ip_address, mac: d.mac_address, vendor: d.vendor, device_type: d.device_type,
         hostname: d.hostname || null, os: d.os || null,
       } });
+      const devName = d.hostname || d.vendor || 'Dispositivo Sconosciuto';
+      const tgText = `🚨 *NetworkScope: Nuovo Dispositivo in Rete!*\n\n• *Nome*: \`${devName}\`\n• *IP*: \`${d.ip_address}\`\n• *MAC*: \`${d.mac_address || 'N/D'}\`\n• *Tipo*: ${d.device_type || 'sconosciuto'}\n• *OS*: ${d.os || 'N/D'}`;
+      sendTelegramAlert(tgText).catch(() => {});
     }
   }
 
@@ -1229,9 +1280,14 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { active: st.active, reason: st.reason, packets: st.packets, flows });
   }
 
-  // Configurazione runtime (chiave VirusTotal) — impostabile dalle Impostazioni
+  // Configurazione runtime (VirusTotal + Telegram) — impostabile dalle Impostazioni
   if (req.method === 'GET' && pathname === '/api/v1/config') {
-    return json(res, 200, { vtConfigured: !!vtApiKey, offline: OFFLINE });
+    return json(res, 200, {
+      vtConfigured: !!vtApiKey,
+      telegramConfigured: !!(tgBotToken && tgChatId),
+      tgChatId: tgChatId || '',
+      offline: OFFLINE,
+    });
   }
   if (req.method === 'POST' && pathname === '/api/v1/config') {
     let raw = '';
@@ -1239,9 +1295,55 @@ const server = createServer(async (req, res) => {
     req.on('end', () => {
       try {
         const b = JSON.parse(raw || '{}');
-        if (typeof b.vtApiKey === 'string') { vtApiKey = b.vtApiKey.trim() || null; vtCache.clear(); saveConfig(); }
+        if (typeof b.vtApiKey === 'string') { vtApiKey = b.vtApiKey.trim() || null; vtCache.clear(); }
+        if (typeof b.tgBotToken === 'string') { tgBotToken = b.tgBotToken.trim() || null; }
+        if (typeof b.tgChatId === 'string') { tgChatId = b.tgChatId.trim() || null; }
+        saveConfig();
       } catch { /* ignore */ }
-      json(res, 200, { vtConfigured: !!vtApiKey });
+      json(res, 200, {
+        vtConfigured: !!vtApiKey,
+        telegramConfigured: !!(tgBotToken && tgChatId),
+      });
+    });
+    return;
+  }
+
+  // Test invio notifica Telegram
+  if (req.method === 'POST' && pathname === '/api/v1/telegram/test') {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', async () => {
+      try {
+        const b = JSON.parse(raw || '{}');
+        const token = b.tgBotToken ? b.tgBotToken.trim() : tgBotToken;
+        const chat = b.tgChatId ? b.tgChatId.trim() : tgChatId;
+        if (!token || !chat) {
+          return json(res, 400, { ok: false, error: 'Token o Chat ID mancante' });
+        }
+        const payload = JSON.stringify({
+          chat_id: chat,
+          text: '🔔 *NetworkScope Homelab Alert*\n\nConnessione Telegram riuscita con successo! Riceverai una notifica ogni volta che un nuovo dispositivo si collega alla rete.',
+          parse_mode: 'Markdown',
+        });
+        const ok = await new Promise((resolve) => {
+          const r = https.request(
+            `https://api.telegram.org/bot${token}/sendMessage`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+              timeout: 5000,
+            },
+            (response) => resolve(response.statusCode === 200)
+          );
+          r.on('error', () => resolve(false));
+          r.on('timeout', () => { r.destroy(); resolve(false); });
+          r.write(payload);
+          r.end();
+        });
+        return json(res, 200, { ok });
+      } catch (err) {
+        return json(res, 500, { ok: false, error: err.message });
+      }
     });
     return;
   }
