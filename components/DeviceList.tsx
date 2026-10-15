@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Device } from '@/types';
 import { triggerPortScan } from '@/lib/api';
@@ -99,15 +99,15 @@ export default function DeviceList({ devices }: DeviceListProps) {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <div className="overflow-x-auto w-full">
+                <table className="w-full text-left divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-900/50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dispositivo</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Indirizzo IP</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dettagli</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stato</th>
-                            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Azioni</th>
+                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dispositivo</th>
+                            <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Indirizzo IP</th>
+                            <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dettagli</th>
+                            <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stato</th>
+                            <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Azioni</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -127,35 +127,37 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                     onClick={() => setSelectedDevice(device)}
                                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group cursor-pointer"
                                 >
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-4 sm:px-6 py-3.5">
                                         <div className="flex items-center">
                                             <div className="flex-shrink-0 h-10 w-10 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300">
                                                 {getDeviceIcon(device.vendor, device.device_type)}
                                             </div>
-                                            <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                            <div className="ml-3 min-w-0 max-w-[150px] sm:max-w-[200px] xl:max-w-xs">
+                                                <div className="text-sm font-medium text-gray-900 dark:text-white truncate" title={device.hostname || device.vendor || device.device_type?.replace('_', ' ') || 'Dispositivo'}>
                                                     {device.hostname || device.vendor || device.device_type?.replace('_', ' ') || 'Dispositivo'}
                                                 </div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={device.mac_address || 'MAC Sconosciuto'}>
                                                     {device.mac_address || 'MAC Sconosciuto'}
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-3 sm:px-4 py-3.5 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <Globe className="w-4 h-4 text-gray-400 mr-2" />
+                                            <Globe className="w-4 h-4 text-gray-400 mr-1.5 flex-shrink-0" />
                                             <span className="text-sm font-mono text-gray-600 dark:text-gray-300">{device.ip_address}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex flex-col gap-1">
+                                    <td className="px-4 sm:px-6 py-3.5">
+                                        <div className="flex flex-col gap-1 min-w-0 max-w-[200px] sm:max-w-[260px] xl:max-w-md">
                                             <span className="inline-flex items-center gap-1 text-xs font-medium capitalize px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 w-fit">
                                                 {device.device_type?.replace('_', ' ') || 'sconosciuto'}
-                                                {device.os ? ` Â· ${device.os}` : ''}
+                                                {device.os ? ` · ${device.os}` : ''}
                                             </span>
-                                            <span className="text-sm text-gray-900 dark:text-white">{device.vendor || 'Vendor Sconosciuto'}</span>
-                                            <div className="flex items-center gap-2">
+                                            <span className="text-sm text-gray-900 dark:text-white truncate block" title={device.vendor || 'Vendor Sconosciuto'}>
+                                                {device.vendor || 'Vendor Sconosciuto'}
+                                            </span>
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 {device.open_ports && device.open_ports.length > 0 && (
                                                     <span className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center">
                                                         <Terminal className="w-3 h-3 mr-1" />
@@ -173,7 +175,7 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-3 sm:px-4 py-3.5 whitespace-nowrap">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${device.is_active
                                             ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800'
                                             : 'bg-gray-50 dark:bg-gray-900/20 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800'
@@ -182,7 +184,7 @@ export default function DeviceList({ devices }: DeviceListProps) {
                                             {device.is_active ? 'Online' : 'Offline'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td className="px-4 sm:px-6 py-3.5 whitespace-nowrap text-right text-sm font-medium">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();

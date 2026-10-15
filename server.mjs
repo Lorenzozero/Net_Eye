@@ -20,8 +20,10 @@ import { ttlOs, isRandomMac, isPrivateIp, parseArpTable, ouiVendor as ouiVendorL
 import { initGeo, lookupGeo, geoStatus } from './lib/server/geo.mjs';
 import { classifyFlow, dpiStatus } from './lib/server/dpi.mjs';
 import { startCapture, flowBytesFor, getFlows, pcapStatus } from './lib/server/pcap.mjs';
+import { parseUpnpXml, queryGatewayStats } from './lib/server/upnp.mjs';
 
 const PORT = 8000;
+let gatewayIgd = null;
 const isWin = process.platform === 'win32';
 const CACHE_FILE = new URL('./.vendor-cache.json', import.meta.url);
 const AGENT_VERSION = '3.0.0';
@@ -574,10 +576,10 @@ function fetchUpnpDesc(location) {
     try {
       const req = http.get(location, { timeout: 1500 }, (res) => {
         let b = '';
-        res.on('data', (c) => { b += c; if (b.length > 16384) req.destroy(); });
+        res.on('data', (c) => { b += c; if (b.length > 32768) req.destroy(); });
         res.on('end', () => {
-          const g = (t) => (b.match(new RegExp(`<${t}>([^<]+)</${t}>`, 'i')) || [])[1]?.trim() || null;
-          resolve({ friendlyName: g('friendlyName'), model: g('modelName'), manufacturer: g('manufacturer') });
+          const parsed = parseUpnpXml(b, location);
+          resolve(parsed);
         });
       });
       req.on('error', () => resolve(null));
@@ -811,6 +813,12 @@ async function fullScan() {
     await Promise.all(Object.entries(ssdp).map(async ([ip, info]) => {
       const desc = info.location ? await fetchUpnpDesc(info.location) : null;
       upnpByIp[ip] = { server: info.server, ...(desc || {}) };
+      if (desc?.igdService && (!gatewayIgd || Date.now() - (gatewayIgd.updatedAt || 0) > 45000)) {
+        try {
+          const stats = await queryGatewayStats(desc.igdService.controlUrl, desc.igdService.serviceType);
+          gatewayIgd = { ...stats, ip, friendlyName: desc.friendlyName, model: desc.modelName, updatedAt: Date.now() };
+        } catch {}
+      }
     }));
     const { newCount, enriched } = await processLive(live, pingInfo, arp, upnpByIp, true);
     const active = devices.filter((d) => d.is_active).length;
@@ -1192,7 +1200,12 @@ const server = createServer(async (req, res) => {
 
   // Capacità avanzate del backend (per le evidenze in frontend): cattura pacchetti, DPI, geo.
   if (req.method === 'GET' && pathname === '/api/v1/capabilities') {
-    return json(res, 200, { pcap: pcapStatus(), dpi: dpiStatus(), geo: geoStatus(), offline: OFFLINE });
+    return json(res, 200, { pcap: pcapStatus(), dpi: dpiStatus(), geo: geoStatus(), offline: OFFLINE, igd: !!gatewayIgd });
+  }
+
+  // Statistiche WAN e port mapping lette dal router via UPnP IGD
+  if (req.method === 'GET' && pathname === '/api/v1/gateway') {
+    return json(res, 200, gatewayIgd || { enabled: false, message: 'Nessun router UPnP IGD rilevato sulla LAN' });
   }
 
   // Flussi catturati dal vivo (cattura pacchetti reale) con anteprima del payload — vista "Wireshark-lite".
@@ -1241,6 +1254,7 @@ const server = createServer(async (req, res) => {
       totals: lastCounters
         ? { bytesIn: lastCounters.bytesIn, bytesOut: lastCounters.bytesOut, pktIn: lastCounters.pktIn, pktOut: lastCounters.pktOut }
         : null,
+      gateway: gatewayIgd,
     });
   }
 

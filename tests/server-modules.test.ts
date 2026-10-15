@@ -138,3 +138,52 @@ describe('geo: computeBackoff', () => {
         expect(geoStatus().provider).toBe('ip-api');
     });
 });
+
+import { parseUpnpXml, parseSoapTag } from '../lib/server/upnp.mjs';
+
+describe('upnp: parseUpnpXml', () => {
+    it('estrae info base del dispositivo e individua il servizio WAN IGD', () => {
+        const xml = `
+        <root>
+          <device>
+            <friendlyName>FRITZ!Box 7530</friendlyName>
+            <modelName>FRITZ!Box 7530</modelName>
+            <manufacturer>AVM</manufacturer>
+            <deviceType>urn:schemas-upnp-org:device:InternetGatewayDevice:1</deviceType>
+            <serviceList>
+              <service>
+                <serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType>
+                <controlURL>/igdupnp/control/WANIPConn1</controlURL>
+              </service>
+            </serviceList>
+          </device>
+        </root>`;
+        const parsed = parseUpnpXml(xml, 'http://192.168.178.1:49000/tr64desc.xml');
+        expect(parsed).not.toBeNull();
+        expect(parsed?.friendlyName).toBe('FRITZ!Box 7530');
+        expect(parsed?.isIgd).toBe(true);
+        expect(parsed?.igdService).not.toBeNull();
+        expect(parsed?.igdService?.serviceType).toBe('urn:schemas-upnp-org:service:WANIPConnection:1');
+        expect(parsed?.igdService?.controlUrl).toBe('http://192.168.178.1:49000/igdupnp/control/WANIPConn1');
+    });
+
+    it('gestisce XML vuoto o non valido senza errori', () => {
+        expect(parseUpnpXml('')).toBeNull();
+    });
+});
+
+describe('upnp: parseSoapTag', () => {
+    it('estrae il valore da una risposta SOAP', () => {
+        const soap = `
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+          <s:Body>
+            <u:GetExternalIPAddressResponse xmlns:u="urn:schemas-upnp-org:service:WANIPConnection:1">
+              <NewExternalIPAddress>93.42.18.112</NewExternalIPAddress>
+            </u:GetExternalIPAddressResponse>
+          </s:Body>
+        </s:Envelope>`;
+        expect(parseSoapTag(soap, 'NewExternalIPAddress')).toBe('93.42.18.112');
+        expect(parseSoapTag(soap, 'TagInesistente')).toBeNull();
+    });
+});
+
