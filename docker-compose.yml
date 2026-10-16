@@ -37,7 +37,13 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_NS_TOKEN=${NS_TOKEN:-}
+      # NON impostare NEXT_PUBLIC_API_URL: in quel caso il BROWSER chiamerebbe
+      # direttamente "localhost:8000", che risolve alla macchina del browser, non
+      # al Pi, se la GUI è aperta da un altro dispositivo — rompe il fetch con
+      # "Failed to fetch". Lasciando questa variabile vuota il frontend usa il
+      # proxy server-side same-origin /api/backend (vedi lib/api.ts), che gira
+      # nel container (network_mode: host) e parla con localhost:8000 lato server.
+      - NS_BACKEND_URL=http://localhost:8000
+      - NS_TOKEN=${NS_TOKEN:-}
     depends_on:
       - backend
