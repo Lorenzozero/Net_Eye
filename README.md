@@ -288,18 +288,19 @@ Distribuito con licenza **MIT**. Consulta il file `LICENSE` per ulteriori dettag
 </div>
 ## 📚 Teoria di ARP Redirection (MITM)
 
-L'ARP (Address Resolution Protocol) è il meccanismo con cui un host traduce un indirizzo IP in un MAC address sulla LAN. Uno **spoofing ARP** consiste nell'inviare risposte ARP fasulle, facendo credere alla vittima che l'indirizzo MAC del router sia quello dell'attaccante. Così il traffico della vittima viene inviato all'attaccante, che può poi:
+L'ARP (Address Resolution Protocol) è il meccanismo con cui un host traduce un indirizzo IP in un MAC address sulla LAN. Uno **spoofing ARP** consiste nell'inviare risposte ARP fasulle, facendo credere alla vittima che l'indirizzo MAC del router sia quello dell'attaccante (e viceversa al router). Così il traffico della vittima transita fisicamente attraverso l'attaccante, che può:
 
-1. **Forwardarlo** verso il router (o verso un altro host) usando NAT, in modo da non interrompere la connettività.
-2. **Analizzarlo** (DPI, logging, ecc.) prima di inoltrarlo.
+1. **Forwardarlo** verso la destinazione reale, in modo da non interrompere la connettività.
+2. **Analizzarlo** (DPI, logging, ecc.) mentre transita.
 
-Il processo tipico è:
+Il processo tipico ("bridge" trasparente, il più semplice e il meno invasivo) è:
 - Abilitare l'IP forwarding sul host attaccante.
-- Aggiungere regole `iptables` per fare NAT del traffico della vittima.
 - Lanciare `arpspoof` in due direzioni:
   - Vittima → router (finto ARP del router)
   - Router → vittima (finto ARP della vittima)
 - Attendere (script idle) fino a interruzione, poi pulire.
+
+> **Niente NAT/`iptables` per il forwarding stesso**: con l'ARP spoofing bidirezionale e l'IP forwarding abilitato, il kernel inoltra già il traffico della vittima con il suo indirizzo IP originale — l'host non ha il proprio ARP avvelenato per l'IP della vittima, quindi risolve il suo MAC reale normalmente. Aggiungere regole NAT qui è superfluo e, se fatto in modo troppo ampio (es. una DNAT che intercetta *tutte* le connessioni verso l'host, non solo quelle della vittima), rischia di bloccare anche gli altri servizi che girano sullo stesso host — è quello che succedeva in una versione precedente di questo script, corretto il 2026-10-16.
 
 Questo metodo non richiede alcuna modifica al router e può essere attivato/disattivato rapidamente, rendendolo ideale per **test di sicurezza** o per **monitorare un singolo dispositivo** nella rete domestica.
 
@@ -324,15 +325,14 @@ sudo ./scripts/arp_redirect.sh <IP_VITTIMA> <IP_ROUTER> [PORTA_BACKEND]
 - `[PORTA_BACKEND]` (opzionale): porta su cui è in ascolto il backend (default 8000).
 
 Lo script:
-1. Abilita l'IP forwarding.
-2. Configura regole `iptables` per il NAT.
-3. Avvia `arpspoof` in entrambe le direzioni (vittima → router e router → vittima).
-4. Mantiene il MITM attivo finché non premi `Ctrl+C`, a quel punto pulisce le regole e ripristina lo stato iniziale.
+1. Abilita l'IP forwarding (sull'host, se nel container non è scrivibile — vedi deploy Raspberry Pi).
+2. Avvia `arpspoof` in entrambe le direzioni (vittima → router e router → vittima).
+3. Mantiene il MITM attivo finché non premi `Ctrl+C` (o non lo fermi dalla GUI), a quel punto termina `arpspoof` e ripristina lo stato iniziale. **Nessuna regola `iptables` viene toccata**: il traffico degli altri servizi sull'host (SSH incluso) non è mai interessato, nemmeno mentre il MITM è attivo.
 
 ### Sicurezza
 - **Solo per reti di prova o reti di tua proprietà.** L'uso non autorizzato è illegale.
 - Lo script non modifica la configurazione del router; tutti i cambiamenti sono temporanei e revocabili al termine.
-- Per fermare l'intercettazione, premi `Ctrl+C`; lo script rimuoverà le regole `iptables` e disabiliterà l'IP forwarding.
+- Per fermare l'intercettazione, premi `Ctrl+C` (o il pulsante "Ferma" dalla GUI); lo script termina `arpspoof` e disabilita l'IP forwarding — nessuna regola di rete persistente viene mai creata.
 
 ### Integrazione con NetworkScope
 Una volta avviato lo script, il backend di NetworkScope riceverà il traffico del dispositivo vittima attraverso la normale interfaccia di rete e potrà analizzarlo come se fosse il traffico della macchina locale. Puoi quindi utilizzare le funzionalità di monitoraggio del flusso, DPI e visualizzazione già presenti nell'app.
@@ -361,7 +361,7 @@ Lo script [`scripts/deploy-raspberrypi.sh`](scripts/deploy-raspberrypi.sh):
 2. Abilita il servizio Docker al boot (`systemctl enable docker`).
 3. Builda e avvia i container con `docker compose up --build -d`.
 
-Il Dockerfile del backend include già `dsniff` (per `arpspoof`) e `iptables`, necessari per il **Metodo 2 – ARP Redirection** descritto sopra, oltre a `libpcap` per la cattura pacchetti reale.
+Il Dockerfile del backend include già `dsniff` (per `arpspoof`), necessario per il **Metodo 2 – ARP Redirection** descritto sopra, oltre a `libpcap` per la cattura pacchetti reale.
 
 ### Autostart dopo reboot
 `restart: unless-stopped` nel `docker-compose.yml` + `docker` abilitato come servizio systemd bastano: il Pi riparte, Docker riparte, i container ripartono — nessuna configurazione aggiuntiva.

@@ -21,8 +21,9 @@
 #
 # Safety notes:
 #   * This script performs a classic MITM attack. Use only on networks you own or have permission to test.
-#   * Stop the script with Ctrl+C; it will clean up iptables and restore the original ARP tables.
-#   * The script does NOT modify router configuration.
+#   * Stop the script with Ctrl+C; it will stop arpspoof and restore normal ARP resolution.
+#   * The script does NOT modify router configuration, and does NOT touch iptables/NAT: only
+#     the two devices being spoofed are affected, never other traffic to/from this host.
 
 set -euo pipefail
 
@@ -52,7 +53,7 @@ echo "[+] Backend:  http://$HOST_IP:$BACKEND_PORT"
 # non è un errore. In quel caso l'IP forwarding va abilitato UNA VOLTA sull'HOST (fuori
 # Docker, persistente) — vedi scripts/deploy-raspberrypi.sh, che lo fa automaticamente.
 # Qui quindi NON è fatale: se è già abilitato (lato host) si prosegue; altrimenti si
-# avvisa e si continua comunque, perché arpspoof/iptables funzionano indipendentemente.
+# avvisa e si continua comunque, perché arpspoof funziona indipendentemente.
 echo "[+] Enabling IP forwarding"
 if [[ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" == "1" ]]; then
   echo "    già abilitato"
@@ -66,10 +67,23 @@ else
   echo "        (persistente: scripts/deploy-raspberrypi.sh lo imposta già in /etc/sysctl.d)"
 fi
 
-# Set up NAT so that forwarded packets appear to come from the host
-echo "[+] Configuring iptables NAT"
-iptables -t nat -A POSTROUTING -s $VICTIM_IP -j MASQUERADE
-iptables -t nat -A PREROUTING -d $HOST_IP -j DNAT --to-destination $VICTIM_IP
+# NIENTE regole NAT qui — e di proposito.
+#
+# Incidente 2026-10-16: una precedente versione di questo script aggiungeva
+#   iptables -t nat -A POSTROUTING -s $VICTIM_IP -j MASQUERADE
+#   iptables -t nat -A PREROUTING -d $HOST_IP -j DNAT --to-destination $VICTIM_IP
+# L'idea era mascherare il traffico della vittima come proprio dell'host e poi
+# ricatturare le risposte dirette all'host per rispedirle alla vittima. Effetto
+# collaterale: la regola PREROUTING -d $HOST_IP intercettava TUTTE le connessioni
+# NUOVE verso l'host — non solo quelle della vittima — rendendo irraggiungibili
+# anche SSH e qualunque altro servizio sul Pi per l'intera durata del MITM.
+#
+# Non serve: con l'ARP spoofing bidirezionale (vittima↔router) e l'IP forwarding
+# abilitato, il kernel inoltra già correttamente il traffico della vittima usando
+# l'indirizzo IP originale (nessun NAT necessario) — l'host NON ha il proprio ARP
+# avvelenato per l'IP della vittima, quindi risolve il suo MAC reale normalmente
+# e la cattura pacchetti (pcap) vede comunque tutto il traffico che attraversa
+# l'interfaccia, NAT o no. Questo è il classico setup "bridge" dell'ARP MITM.
 
 # Start arpspoof in background for both directions
 echo "[+] Starting arpspoof (victim -> router)"
@@ -85,9 +99,6 @@ cleanup() {
   echo "\n[!] Caught interrupt – cleaning up"
   echo "[+] Killing arpspoof processes"
   kill $PID_V2R $PID_R2V 2>/dev/null || true
-  echo "[+] Removing iptables rules"
-  iptables -t nat -D POSTROUTING -s $VICTIM_IP -j MASQUERADE || true
-  iptables -t nat -D PREROUTING -d $HOST_IP -j DNAT --to-destination $VICTIM_IP || true
   echo "[+] Disabling IP forwarding"
   # Non fatale: se è stato abilitato a livello host (deploy-raspberrypi.sh) va lasciato
   # acceso lì — qui si tenta solo la pulizia locale, se possibile.

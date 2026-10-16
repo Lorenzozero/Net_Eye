@@ -4,8 +4,10 @@ FROM node:20-bookworm-slim
 # mentre su Debian (bookworm) sono pacchetti apt stabili e multi-arch (ARM incluso, es. Raspberry Pi).
 #
 # Strumenti di rete usati dallo scanner (ping, arp, netstat) + runtime libpcap per la cattura pacchetti
-# + dsniff (arpspoof) e iptables per il Metodo 2 (ARP Redirection / MITM, vedi scripts/arp_redirect.sh)
-# + procps (sysctl, usato dallo script per abilitare/disabilitare l'IP forwarding)
+# + dsniff (arpspoof) per il Metodo 2 (ARP Redirection / MITM, vedi scripts/arp_redirect.sh — che
+#   di proposito NON tocca mai iptables/NAT, vedi i commenti nello script)
+# + procps (sysctl, fallback per l'IP forwarding) + iptables (solo diagnostica/debug manuale,
+#   non richiesto in uso normale)
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       iputils-ping net-tools iproute2 libpcap0.8 dsniff iptables procps bash ca-certificates \
