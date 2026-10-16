@@ -21,6 +21,7 @@ import { initGeo, lookupGeo, geoStatus } from './lib/server/geo.mjs';
 import { classifyFlow, dpiStatus } from './lib/server/dpi.mjs';
 import { startCapture, flowBytesFor, getFlows, pcapStatus } from './lib/server/pcap.mjs';
 import { parseUpnpXml, queryGatewayStats } from './lib/server/upnp.mjs';
+import { startMitm, stopMitm, mitmStatus, mitmLog } from './lib/server/mitm.mjs';
 
 const PORT = 8000;
 let gatewayIgd = null;
@@ -1257,6 +1258,31 @@ const server = createServer(async (req, res) => {
   // Statistiche WAN e port mapping lette dal router via UPnP IGD
   if (req.method === 'GET' && pathname === '/api/v1/gateway') {
     return json(res, 200, gatewayIgd || { enabled: false, message: 'Nessun router UPnP IGD rilevato sulla LAN' });
+  }
+
+  // Metodo 2 — ARP Redirection (MITM), vedi README "⚙️ Metodo 2". Solo su reti di tua proprietà.
+  if (req.method === 'GET' && pathname === '/api/v1/mitm') return json(res, 200, mitmStatus());
+
+  if (req.method === 'POST' && pathname === '/api/v1/mitm/start') {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      let body = {};
+      try { body = JSON.parse(raw || '{}'); } catch { /* body non valido → validazione sotto fallisce */ }
+      const result = startMitm(body.victimIp, body.routerIp || gatewayIgd?.ip || `${local.base}.1`);
+      return json(res, result.ok ? 200 : 400, result);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/v1/mitm/stop') {
+    const result = stopMitm();
+    return json(res, result.ok ? 200 : 400, result);
+  }
+
+  if (req.method === 'GET' && pathname === '/api/v1/mitm/log') {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end(mitmLog());
   }
 
   // Flussi catturati dal vivo (cattura pacchetti reale) con anteprima del payload — vista "Wireshark-lite".

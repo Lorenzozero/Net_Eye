@@ -211,3 +211,38 @@ export async function testTelegram(tgBotToken?: string, tgChatId?: string): Prom
     return res.json();
 }
 
+// Metodo 2 — ARP Redirection (MITM). Solo su reti di tua proprietà o dove hai il permesso di testare.
+export interface MitmStatus {
+    active: boolean;
+    victimIp?: string;
+    routerIp?: string;
+    startedAt?: number;
+    expiresAt?: number; // stop automatico di sicurezza lato backend
+}
+
+export async function fetchMitmStatus(): Promise<MitmStatus> {
+    const res = await apiFetch('/api/v1/mitm');
+    if (!res.ok) throw new Error('Impossibile recuperare lo stato MITM');
+    return res.json();
+}
+
+export async function startMitm(victimIp: string, routerIp?: string): Promise<MitmStatus & { ok: boolean; error?: string }> {
+    const res = await apiFetch('/api/v1/mitm/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ victimIp, routerIp }),
+    });
+    return res.json();
+}
+
+export async function stopMitm(): Promise<{ ok: boolean; error?: string }> {
+    const res = await apiFetch('/api/v1/mitm/stop', { method: 'POST' });
+    return res.json();
+}
+
+export async function fetchMitmLog(): Promise<string> {
+    const res = await apiFetch('/api/v1/mitm/log');
+    if (!res.ok) return '';
+    return res.text();
+}
+

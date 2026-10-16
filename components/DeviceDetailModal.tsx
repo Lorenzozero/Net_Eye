@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Device } from '@/types';
-import { triggerPortScan } from '@/lib/api';
+import { triggerPortScan, fetchMitmStatus, startMitm, stopMitm, type MitmStatus } from '@/lib/api';
 import { serviceName } from '@/lib/services';
 import { getConnection } from '@/lib/connect';
 import TerminalModal from '@/components/TerminalModal';
-import { Server, Terminal, ExternalLink, Plug } from 'lucide-react';
+import { Server, Terminal, ExternalLink, Plug, ShieldAlert } from 'lucide-react';
 
 type Term = { ip: string; port: number; title: string; hint: string };
 
@@ -27,10 +27,45 @@ export default function DeviceDetailModal({ device, onClose }: { device: Device;
     const [scanning, setScanning] = useState(false);
     const [term, setTerm] = useState<Term | null>(null);
 
+    // Metodo 2 — ARP Redirection (MITM)
+    const [mitm, setMitm] = useState<MitmStatus | null>(null);
+    const [mitmBusy, setMitmBusy] = useState(false);
+    const [mitmError, setMitmError] = useState<string | null>(null);
+    const [routerIp, setRouterIp] = useState('');
+    const [confirmed, setConfirmed] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        const poll = () => fetchMitmStatus().then((s) => alive && setMitm(s)).catch(() => {});
+        poll();
+        const id = setInterval(poll, 4000);
+        return () => { alive = false; clearInterval(id); };
+    }, []);
+
     const handleScan = async () => {
         setScanning(true);
         try { await triggerPortScan(device.ip_address); } catch { /* ignore */ }
         finally { setTimeout(() => setScanning(false), 2000); }
+    };
+
+    const handleMitmStart = async () => {
+        setMitmBusy(true); setMitmError(null);
+        try {
+            const r = await startMitm(device.ip_address, routerIp || undefined);
+            if (!r.ok) setMitmError(r.error || 'Avvio fallito');
+            else setMitm(r);
+        } catch { setMitmError('Avvio fallito (errore di rete)'); }
+        finally { setMitmBusy(false); }
+    };
+
+    const handleMitmStop = async () => {
+        setMitmBusy(true); setMitmError(null);
+        try {
+            const r = await stopMitm();
+            if (!r.ok) setMitmError(r.error || 'Stop fallito');
+            else setMitm({ active: false });
+        } catch { setMitmError('Stop fallito (errore di rete)'); }
+        finally { setMitmBusy(false); }
     };
 
     const connect = (port: number) => {
@@ -124,6 +159,50 @@ export default function DeviceDetailModal({ device, onClose }: { device: Device;
                             </p>
                         </div>
                     )}
+
+                    <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 p-3 space-y-2">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-red-700 dark:text-red-300 uppercase">
+                            <ShieldAlert className="w-3.5 h-3.5" /> Metodo 2 — Intercettazione traffico (MITM)
+                        </label>
+                        <p className="text-xs text-red-700/80 dark:text-red-300/80">
+                            ARP spoofing: reindirizza il traffico di questo dispositivo attraverso NetworkScope. Usa solo su reti di tua proprietà o con permesso esplicito.
+                        </p>
+
+                        {mitm?.active && mitm.victimIp === device.ip_address ? (
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs text-red-700 dark:text-red-300">
+                                    Attivo dalle {mitm.startedAt ? new Date(mitm.startedAt).toLocaleTimeString('it-IT') : '–'}
+                                    {mitm.expiresAt && ` · stop automatico alle ${new Date(mitm.expiresAt).toLocaleTimeString('it-IT')}`}
+                                </span>
+                                <button onClick={handleMitmStop} disabled={mitmBusy} className="shrink-0 px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
+                                    {mitmBusy ? 'Arresto…' : 'Ferma'}
+                                </button>
+                            </div>
+                        ) : mitm?.active ? (
+                            <p className="text-xs text-red-700 dark:text-red-300">Un altro MITM è già attivo su {mitm.victimIp}. Fermalo prima di avviarne uno nuovo.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                <label className="flex items-start gap-2 text-xs text-red-700 dark:text-red-300">
+                                    <input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+                                    Confermo di avere il permesso di intercettare il traffico di questo dispositivo su questa rete.
+                                </label>
+                                <input
+                                    value={routerIp}
+                                    onChange={(e) => setRouterIp(e.target.value)}
+                                    placeholder="IP del router (vuoto = rilevato automaticamente)"
+                                    className="w-full px-2 py-1 text-xs rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 font-mono placeholder:text-red-400/60 dark:placeholder:text-red-300/40"
+                                />
+                                <button
+                                    onClick={handleMitmStart}
+                                    disabled={!confirmed || mitmBusy}
+                                    className="w-full px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {mitmBusy ? 'Avvio…' : 'Avvia intercettazione'}
+                                </button>
+                            </div>
+                        )}
+                        {mitmError && <p className="text-xs text-red-600 dark:text-red-400">{mitmError}</p>}
+                    </div>
                 </div>
 
                 <div className="flex justify-end gap-2 p-4 border-t border-slate-200/70 dark:border-white/10">
