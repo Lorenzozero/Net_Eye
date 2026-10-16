@@ -23,6 +23,12 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Il server standalone generato da Next.js usa $HOSTNAME come indirizzo su cui
+# ascoltare. Con network_mode:host il container eredita l'hostname REALE della
+# macchina (es. "serverLorenzo") invece di un IP: il server prova a fare la
+# resolve DNS di quel nome come bind address e fallisce ("getaddrinfo ENOTFOUND").
+# Fix standard per i deploy standalone di Next.js in Docker: forzare 0.0.0.0.
+ENV HOSTNAME="0.0.0.0"
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
