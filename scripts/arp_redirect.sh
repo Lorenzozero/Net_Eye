@@ -46,14 +46,24 @@ echo "[+] Router:   $ROUTER_IP"
 echo "[+] Host IP:  $HOST_IP"
 echo "[+] Backend:  http://$HOST_IP:$BACKEND_PORT"
 
-# Enable IP forwarding
-# Scrittura diretta su /proc/sys (funziona ovunque, nessun binario esterno richiesto)
-# con sysctl come fallback se per qualche motivo /proc/sys non fosse scrivibile.
+# Enable IP forwarding.
+# In un container non privilegiato (es. docker-compose di NetworkScope) /proc/sys è
+# montato in sola lettura anche con CAP_NET_ADMIN: la scrittura qui fallisce per design,
+# non è un errore. In quel caso l'IP forwarding va abilitato UNA VOLTA sull'HOST (fuori
+# Docker, persistente) — vedi scripts/deploy-raspberrypi.sh, che lo fa automaticamente.
+# Qui quindi NON è fatale: se è già abilitato (lato host) si prosegue; altrimenti si
+# avvisa e si continua comunque, perché arpspoof/iptables funzionano indipendentemente.
 echo "[+] Enabling IP forwarding"
-if [[ -w /proc/sys/net/ipv4/ip_forward ]]; then
-  echo 1 > /proc/sys/net/ipv4/ip_forward
+if [[ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" == "1" ]]; then
+  echo "    già abilitato"
+elif [[ -w /proc/sys/net/ipv4/ip_forward ]] && echo 1 > /proc/sys/net/ipv4/ip_forward 2>/dev/null; then
+  echo "    abilitato ora"
+elif sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1; then
+  echo "    abilitato ora (sysctl)"
 else
-  sysctl -w net.ipv4.ip_forward=1 > /dev/null
+  echo "    [!] impossibile scriverlo da qui (probabile container non privilegiato)."
+  echo "        Abilitalo UNA VOLTA sull'host: sudo sysctl -w net.ipv4.ip_forward=1"
+  echo "        (persistente: scripts/deploy-raspberrypi.sh lo imposta già in /etc/sysctl.d)"
 fi
 
 # Set up NAT so that forwarded packets appear to come from the host
@@ -79,11 +89,11 @@ cleanup() {
   iptables -t nat -D POSTROUTING -s $VICTIM_IP -j MASQUERADE || true
   iptables -t nat -D PREROUTING -d $HOST_IP -j DNAT --to-destination $VICTIM_IP || true
   echo "[+] Disabling IP forwarding"
-  if [[ -w /proc/sys/net/ipv4/ip_forward ]]; then
-    echo 0 > /proc/sys/net/ipv4/ip_forward
-  else
-    sysctl -w net.ipv4.ip_forward=0 > /dev/null
-  fi
+  # Non fatale: se è stato abilitato a livello host (deploy-raspberrypi.sh) va lasciato
+  # acceso lì — qui si tenta solo la pulizia locale, se possibile.
+  { [[ -w /proc/sys/net/ipv4/ip_forward ]] && echo 0 > /proc/sys/net/ipv4/ip_forward; } 2>/dev/null \
+    || sysctl -w net.ipv4.ip_forward=0 > /dev/null 2>&1 \
+    || true
   echo "[+] Done."
   exit 0
 }

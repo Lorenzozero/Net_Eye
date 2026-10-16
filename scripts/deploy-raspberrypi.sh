@@ -48,14 +48,28 @@ fi
 # 3. Servizio Docker attivo al boot
 sudo systemctl enable --now docker
 
-# 4. Variabili d'ambiente opzionali (token di autenticazione API/WS)
+# 4. IP forwarding (necessario per il Metodo 2 — ARP Redirection/MITM).
+#    Va abilitato sull'HOST: il container backend gira in network_mode "host" ma NON
+#    privilegiato, e Docker monta /proc/sys in sola lettura nei container non
+#    privilegiati anche con CAP_NET_ADMIN — scriverlo da dentro il container fallisce
+#    per design. Persistente via /etc/sysctl.d, così sopravvive anche a un reboot.
+SYSCTL_FILE="/etc/sysctl.d/99-networkscope.conf"
+if [[ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" != "1" ]] || [[ ! -f "$SYSCTL_FILE" ]]; then
+  echo "[+] Abilito IP forwarding sull'host (persistente in $SYSCTL_FILE)"
+  echo "net.ipv4.ip_forward=1" | sudo tee "$SYSCTL_FILE" >/dev/null
+  sudo sysctl -p "$SYSCTL_FILE" >/dev/null
+else
+  echo "[+] IP forwarding già abilitato sull'host"
+fi
+
+# 5. Variabili d'ambiente opzionali (token di autenticazione API/WS)
 if [[ -n "${NS_TOKEN:-}" ]]; then
   echo "[+] NS_TOKEN impostato: autenticazione API/WebSocket abilitata"
 else
   echo "[i] NS_TOKEN non impostato: API/WebSocket senza autenticazione (ok in LAN fidata, sconsigliato altrimenti)"
 fi
 
-# 5. Build + avvio (usa sudo se l'utente non è ancora nel gruppo docker in questa sessione)
+# 6. Build + avvio (usa sudo se l'utente non è ancora nel gruppo docker in questa sessione)
 DOCKER_CMD="docker"
 if ! docker info >/dev/null 2>&1; then
   DOCKER_CMD="sudo docker"
