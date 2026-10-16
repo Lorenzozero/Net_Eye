@@ -47,8 +47,14 @@ echo "[+] Host IP:  $HOST_IP"
 echo "[+] Backend:  http://$HOST_IP:$BACKEND_PORT"
 
 # Enable IP forwarding
+# Scrittura diretta su /proc/sys (funziona ovunque, nessun binario esterno richiesto)
+# con sysctl come fallback se per qualche motivo /proc/sys non fosse scrivibile.
 echo "[+] Enabling IP forwarding"
-sysctl -w net.ipv4.ip_forward=1 > /dev/null
+if [[ -w /proc/sys/net/ipv4/ip_forward ]]; then
+  echo 1 > /proc/sys/net/ipv4/ip_forward
+else
+  sysctl -w net.ipv4.ip_forward=1 > /dev/null
+fi
 
 # Set up NAT so that forwarded packets appear to come from the host
 echo "[+] Configuring iptables NAT"
@@ -73,7 +79,11 @@ cleanup() {
   iptables -t nat -D POSTROUTING -s $VICTIM_IP -j MASQUERADE || true
   iptables -t nat -D PREROUTING -d $HOST_IP -j DNAT --to-destination $VICTIM_IP || true
   echo "[+] Disabling IP forwarding"
-  sysctl -w net.ipv4.ip_forward=0 > /dev/null
+  if [[ -w /proc/sys/net/ipv4/ip_forward ]]; then
+    echo 0 > /proc/sys/net/ipv4/ip_forward
+  else
+    sysctl -w net.ipv4.ip_forward=0 > /dev/null
+  fi
   echo "[+] Done."
   exit 0
 }

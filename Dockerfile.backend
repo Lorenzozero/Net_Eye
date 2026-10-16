@@ -5,9 +5,10 @@ FROM node:20-bookworm-slim
 #
 # Strumenti di rete usati dallo scanner (ping, arp, netstat) + runtime libpcap per la cattura pacchetti
 # + dsniff (arpspoof) e iptables per il Metodo 2 (ARP Redirection / MITM, vedi scripts/arp_redirect.sh)
+# + procps (sysctl, usato dallo script per abilitare/disabilitare l'IP forwarding)
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      iputils-ping net-tools iproute2 libpcap0.8 dsniff iptables bash ca-certificates \
+      iputils-ping net-tools iproute2 libpcap0.8 dsniff iptables procps bash ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
