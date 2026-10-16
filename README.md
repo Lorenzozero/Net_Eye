@@ -337,6 +337,27 @@ Lo script:
 ### Integrazione con NetworkScope
 Una volta avviato lo script, il backend di NetworkScope riceverà il traffico del dispositivo vittima attraverso la normale interfaccia di rete e potrà analizzarlo come se fosse il traffico della macchina locale. Puoi quindi utilizzare le funzionalità di monitoraggio del flusso, DPI e visualizzazione già presenti nell'app.
 
+### 🖱️ Avvio/stop dalla GUI (senza terminale)
+
+Non serve lanciare lo script a mano: ogni dispositivo nella dashboard ha un pannello **"Metodo 2 — Intercettazione traffico (MITM)"** nel suo dettaglio (click sul dispositivo → "Dettagli completi").
+
+1. Spunta la checkbox di conferma ("ho il permesso di intercettare questo dispositivo").
+2. (Opzionale) indica l'IP del router — se lo lasci vuoto viene rilevato automaticamente.
+3. Premi **"Avvia intercettazione"**.
+
+Lo stato è live (polling ogni 4s): mostra da quando è attivo e quando scatta lo stop automatico di sicurezza (20 minuti, per non lasciarlo acceso per sbaglio). Premi **"Ferma"** per interromperlo quando vuoi.
+
+Dietro le quinte, la GUI chiama queste API del backend (autenticate come le altre, se `NS_TOKEN` è impostato):
+
+| Endpoint | Cosa fa |
+|---|---|
+| `GET /api/v1/mitm` | stato corrente (attivo/non attivo, da quando, scadenza) |
+| `POST /api/v1/mitm/start` | avvia (`{ victimIp, routerIp? }`) |
+| `POST /api/v1/mitm/stop` | ferma |
+| `GET /api/v1/mitm/log` | log testuale dello script (utile per capire un eventuale errore) |
+
+Solo un MITM alla volta; un secondo `start` mentre uno è già attivo viene rifiutato. Il backend deve girare come root con `CAP_NET_ADMIN`/`CAP_NET_RAW` (già impostato nel `docker-compose.yml`).
+
 ---
 
 ## 🍓 Deploy su Raspberry Pi
@@ -359,7 +380,8 @@ chmod +x scripts/deploy-raspberrypi.sh
 Lo script [`scripts/deploy-raspberrypi.sh`](scripts/deploy-raspberrypi.sh):
 1. Installa Docker + plugin Compose se mancanti.
 2. Abilita il servizio Docker al boot (`systemctl enable docker`).
-3. Builda e avvia i container con `docker compose up --build -d`.
+3. Abilita l'IP forwarding sull'host, persistente (`/etc/sysctl.d/99-networkscope.conf`) — serve al Metodo 2/MITM; va fatto sull'host perché un container non privilegiato non può scrivere `/proc/sys/net/*` anche con `CAP_NET_ADMIN`.
+4. Builda e avvia i container con `docker compose up --build -d` (frontend in build di produzione, non `next dev`).
 
 Il Dockerfile del backend include già `dsniff` (per `arpspoof`), necessario per il **Metodo 2 – ARP Redirection** descritto sopra, oltre a `libpcap` per la cattura pacchetti reale.
 
@@ -374,10 +396,11 @@ docker compose up --build -d
 
 ### Note specifiche Pi
 - La build nativa del modulo `cap` (binding libpcap) richiede compilazione: la prima build può richiedere qualche minuto in più rispetto a un PC (già gestito dallo script/Dockerfile, non serve azione manuale).
-- Per il Metodo 2 (ARP Redirection) via Docker sul Pi, entra nel container ed esegui lo script lì dentro (ha già i binari e le capability `NET_ADMIN`/`NET_RAW`):
+- Per il Metodo 2 (ARP Redirection) via Docker sul Pi, il modo consigliato è la **GUI** (sezione "🖱️ Avvio/stop dalla GUI" più sopra) — nessun comando da terminale necessario. In alternativa, da terminale sul Pi:
   ```bash
-  docker compose exec backend sh -c "./scripts/arp_redirect.sh <victim_ip> <router_ip>"
+  docker compose exec backend bash -c "./scripts/arp_redirect.sh <victim_ip> <router_ip>"
   ```
-- Monitora temperatura/throughput su Pi 3 se analizzi reti molto cariche; su Pi 4/5 non è un problema in condizioni normali.
+- Monitora temperatura/throughput su Pi 3 se analizzi reti molto cariche; su Pi 4/5 non è un problema in condizioni normali (`vcgencmd measure_temp` e `vcgencmd get_throttled` per un check rapido — `throttled=0x0` = tutto ok).
+- Pulizia periodica consigliata se il disco si riempie: `docker image prune -f`, `docker builder prune -f` sono sempre sicuri; `docker volume prune` **solo** dopo aver controllato che non ci siano volumi di altri servizi che vuoi tenere (`docker volume ls`).
 
 ---
