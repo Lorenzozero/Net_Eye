@@ -11,4 +11,10 @@ RUN npm install --ignore-scripts
 
 COPY . .
 
-CMD ["npm", "run", "dev"]
+# Build di produzione: niente Turbopack dev-server/HMR in continuo (misurato ~60% CPU
+# su Raspberry Pi 5 in modalità "next dev" 24/7) — `next start` serve l'output già
+# compilato, molto più leggero per un servizio che gira sempre acceso.
+RUN npm run build
+
+EXPOSE 3000
+CMD ["npm", "run", "start"]
