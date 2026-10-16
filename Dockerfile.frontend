@@ -1,9 +1,12 @@
-FROM node:20-alpine
+# Build multi-stage con output "standalone" di Next.js: l'immagine finale contiene
+# solo il server minimale + le dipendenze di produzione effettivamente usate (niente
+# devDependencies, niente sorgenti, niente node_modules completo) — da ~1.6GB a poche
+# centinaia di MB.
 
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-
 # --ignore-scripts: salta la build nativa di `cap` (binding libpcap, serve solo a
 # server.mjs/backend, mai importato dal frontend) — evita di dover installare
 # toolchain Python/gcc qui solo per compilare un modulo che non viene usato.
@@ -12,9 +15,18 @@ RUN npm install --ignore-scripts
 COPY . .
 
 # Build di produzione: niente Turbopack dev-server/HMR in continuo (misurato ~60% CPU
-# su Raspberry Pi 5 in modalità "next dev" 24/7) — `next start` serve l'output già
-# compilato, molto più leggero per un servizio che gira sempre acceso.
+# su Raspberry Pi 5 in modalità "next dev" 24/7) — l'output standalone (next.config.ts)
+# è un server già pronto, molto più leggero per un servizio che gira sempre acceso.
 RUN npm run build
 
+# --- immagine finale: solo l'output standalone, nessun tool di build ---
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]
